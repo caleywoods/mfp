@@ -1,0 +1,18 @@
+{
+  "name": "mfp",
+  "version": "1.0.0",
+  "description": "Mazes For Programmers",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc -p ./src",
+    "start": "npm run build -- -w"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/paper": "^0.9.14",
+    "paper": "^0.11.5",
+    "typescript": "^2.7.2"
+  }
+}

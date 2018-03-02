@@ -1,0 +1,10 @@
+{
+    "compilerOptions": {
+      "declaration": false,
+      "module": "es6",
+      "outDir": "../dist/out-tsc",
+      "sourceMap": true,
+      "target": "es6",
+    },
+    "exclude": [ "node_modules", "platforms" ]
+  }
