@@ -5,9 +5,9 @@ const gridConfig = {
     squareWidth: 100
 };
 
-const maze = new Grid(4,4, gridConfig);
+const maze = new Grid(8, 10, gridConfig);
 
-maze.setStart(4,1);
-maze.setEnd(1, 4);
+maze.setStart(4, 1);
+maze.setEnd(8, 10);
 
 maze.draw();
