@@ -19,10 +19,6 @@ export default class Grid {
         console.log('Grid has been constructed: ', this.nodes);
     }
 
-    addNode(node) {
-        this.nodes.push(node);
-    }
-
     setStart(row, col) {
         const node = this.nodes[row][col];
         node.isStart = true;
