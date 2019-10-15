@@ -1,6 +1,8 @@
 
 export default class Grid {
-    constructor() {
+    constructor(_rows, _cols) {
+        this.cols = _cols;
+        this.rows = _rows;
         this.nodes = [];
     }
 
