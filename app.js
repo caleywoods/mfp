@@ -4,6 +4,7 @@ const context     = maze_canvas.getContext('2d');
 const wh = [100,100];
 
 context.strokeStyle = 'blue';
+context.lineWidth = 5;
 
 // Column 1
 context.strokeRect(50,50,...wh);
@@ -16,7 +17,6 @@ context.strokeRect(150,50,...wh);
 context.strokeRect(150,150, ...wh);
 context.strokeRect(150,250, ...wh);
 context.strokeRect(150,350, ...wh);
-
 
 // Column 3
 context.strokeRect(250,50,...wh);
