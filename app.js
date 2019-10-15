@@ -1,3 +1,9 @@
+import Grid from './classes/Grid.js';
+import Node from './classes/Node.js';
+
+const ourGrid = new Grid();
+console.log(ourGrid);
+
 const maze_canvas = document.querySelector('#maze');
 const context     = maze_canvas.getContext('2d');
 
