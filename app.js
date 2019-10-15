@@ -1,7 +1,13 @@
 import Grid from './classes/Grid.js';
 
-const maze = new Grid(4,4);
+const gridConfig = {
+    squareHeight: 100,
+    squareWidth: 100
+};
+
+const maze = new Grid(4,4, gridConfig);
+
 maze.setStart(4,1);
-console.log(maze);
+maze.setEnd(1, 4);
 
 maze.draw();
