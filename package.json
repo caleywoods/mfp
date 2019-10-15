@@ -1,0 +1,24 @@
+{
+  "name": "mfp",
+  "version": "1.0.0",
+  "description": "Mazes for programmers",
+  "main": "app.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caleywoods/mfp.git"
+  },
+  "keywords": [
+    "maze",
+    "puzzle",
+    "algorithm"
+  ],
+  "author": "caleywoods",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/caleywoods/mfp/issues"
+  },
+  "homepage": "https://github.com/caleywoods/mfp#readme"
+}
