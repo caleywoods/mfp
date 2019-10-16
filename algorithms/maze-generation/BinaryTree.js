@@ -36,7 +36,7 @@ class BinaryTree {
                          *   "blocking" our path
                          * - We then need to use lineTo() to draw the North, West, and Southern "walls" back in place
                          * - We also need to then use lineTo() to draw the North, East, and Southern "walls" of our cell to the East back in place
-                         *   we have to eliminate it's western wall so that the these two cells are now open or "connected"
+                         *   we have to eliminate its western wall so that the these two cells are now open or "connected"
                          */
                     }
                     continue;
