@@ -15,16 +15,21 @@
  * moves/erases to make so we need to choose another cell.
  */
 
-import getRandomNumber from '../../utils/utils.js';
+import { getRandomNumber } from '../../utils/utils.js';
+import Grid from '../../classes/Grid.js';
 
-class BinaryTree {
-    generate(grid) {
+export default class BinaryTree extends Grid {
+    constructor(_rows, _cols, config = null) {
+        super(_rows, _cols, config);
+    }
+
+    draw() {
         const visited = [];
-        for (let row = 0; i < grid.rows; row++) {
+        for (let row = 0; row < this.rows; row++) {
             const northConstrained = row === 0;
-            for (let col = 0; i < grid.cols; col++) {
-                const eastConstrained = col === grid.cols - 1;
-                const cell = grid.cells[row][col];
+            for (let col = 0; col < this.cols; col++) {
+                const eastConstrained = col === this.cols - 1;
+                const cell = this.cells[row][col];
                 visited.push(cell.id);
 
                 if (northConstrained) {

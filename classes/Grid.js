@@ -28,6 +28,8 @@ export default class Grid {
                 id++;
             }
         }
+
+        console.log('Grid has been constructed');
     }
 
     setStart(row, col) {
