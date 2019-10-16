@@ -1,6 +1,7 @@
 export default class Cell {
-    constructor() {
+    constructor(id) {
         this.isStart = false;
         this.isEnd = false;
+        this.id = id;
     }
 }

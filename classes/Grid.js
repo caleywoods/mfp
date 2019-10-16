@@ -19,11 +19,13 @@ export default class Grid {
 
     // Build a 2D array to hold our cell information
     buildGrid() {
+        let id = 0;
         for (let row = 0; row < this.rows; row++) {
             this.cells[row] = [];
             for (let col = 0; col < this.cols; col++) {
-                const cell = new Cell();
+                const cell = new Cell(id);
                 this.cells[row][col] = cell;
+                id++;
             }
         }
     }
