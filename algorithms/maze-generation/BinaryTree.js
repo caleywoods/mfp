@@ -24,11 +24,47 @@ export default class BinaryTree extends Grid {
     }
 
     draw() {
+        console.log('Drawing Binary Tree');
         const visited = [];
+        const maze_canvas = document.querySelector('#maze');
+        const context = maze_canvas.getContext('2d');
+
+        context.strokeStyle = '#222529';
+        context.beginPath();
+        context.moveTo(50,50);
         for (let row = 0; row < this.rows; row++) {
             const northConstrained = row === 0;
+            const southBorder = row === this.rows - 1;
+            const pixelsWide = this.squareWidth * this.cols;
+            const pixelsHigh = this.squareHeight * this.rows;
+
+            // Draw northern border
+            if (northConstrained) {
+                context.lineTo(pixelsWide, 50);
+            }
+
+            // Draw southern border
+            if (southBorder) {
+                context.moveTo(this.squareWidth, pixelsHigh);
+                context.lineTo(pixelsWide, pixelsWide);
+            }
+
             for (let col = 0; col < this.cols; col++) {
                 const eastConstrained = col === this.cols - 1;
+                const westConstrained = col === 0;
+
+                // Draw western border
+                if (westConstrained) {
+                    context.moveTo(this.squareWidth, this.squareHeight);
+                    context.lineTo(this.squareWidth, pixelsHigh)
+                }
+
+                // Draw eastern border
+                if (eastConstrained) {
+                    context.moveTo(pixelsWide, this.squareHeight);
+                    context.lineTo(pixelsWide, pixelsHigh);
+                }
+
                 const cell = this.cells[row][col];
                 visited.push(cell.id);
 
@@ -56,6 +92,7 @@ export default class BinaryTree extends Grid {
                 }
             }
         }
+        context.stroke();
     }
 
 }
