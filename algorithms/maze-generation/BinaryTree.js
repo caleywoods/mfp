@@ -80,14 +80,12 @@ export default class BinaryTree extends Grid {
 
                 if (northConstrained) {
                     if (!eastConstrained) {
-                        // Draw south
-                        context.moveTo(x, this.squareHeight * 2);
-                        context.lineTo(this.squareWidth * 2, this.squareHeight * 2);
                     }
                     continue;
                 }
 
                 const randomNumber = getRandomNumber(0, 10);
+                context.moveTo(x, y);
                 if (randomNumber > 5) {
                     // draw west/east
                 } else {
