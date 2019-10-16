@@ -59,6 +59,7 @@ export default class Grid {
 
         context.strokeStyle = '#222529';
         context.lineWidth = 5;
+        context.font = '20px sans-serif';
         let x = 50;
         for (let col = 0; col < this.cols; col++) {
             if (col > 0) {
@@ -81,6 +82,8 @@ export default class Grid {
                 }
 
                 context.strokeRect(x, y, ...wh);
+                // Fill our cell with it's ID for easy....well ID
+                context.fillText(cell.id, x + this.squareWidth / 2.25, y + this.squareHeight / 1.75);
             }
         }
     }
