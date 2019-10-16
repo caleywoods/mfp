@@ -28,16 +28,21 @@ export default class BinaryTree extends Grid {
         const visited = [];
         const maze_canvas = document.querySelector('#maze');
         const context = maze_canvas.getContext('2d');
+        const wh = [100, 100];
 
         context.strokeStyle = '#222529';
         context.beginPath();
         context.moveTo(50,50);
+        let y = this.squareWidth || wh[0];
         for (let row = 0; row < this.rows; row++) {
             const northConstrained = row === 0;
             const southBorder = row === this.rows - 1;
             const pixelsWide = this.squareWidth * this.cols;
             const pixelsHigh = this.squareHeight * this.rows;
 
+            if (row > 0) {
+                y += this.squareHeight || wh[1];
+            }
             // Draw northern border
             if (northConstrained) {
                 context.lineTo(pixelsWide, 50);
@@ -49,9 +54,14 @@ export default class BinaryTree extends Grid {
                 context.lineTo(pixelsWide, pixelsWide);
             }
 
+            let x = this.squareWidth || wh[1];
             for (let col = 0; col < this.cols; col++) {
                 const eastConstrained = col === this.cols - 1;
                 const westConstrained = col === 0;
+
+                if (col > 0) {
+                    x += this.squareWidth || wh[0];
+                }
 
                 // Draw western border
                 if (westConstrained) {
@@ -70,25 +80,18 @@ export default class BinaryTree extends Grid {
 
                 if (northConstrained) {
                     if (!eastConstrained) {
-                        // Erase east
-                        /**
-                         * - call clearRect at this cells x,y to totally clear that rectangle
-                         * - We also need to clearRect at the next cell to the right, otherwise we're left with the strokeWidth from that cell
-                         *   "blocking" our path
-                         * - We then need to use lineTo() to draw the North, West, and Southern "walls" back in place
-                         * - We also need to then use lineTo() to draw the North, East, and Southern "walls" of our cell to the East back in place
-                         *   we have to eliminate its western wall so that the these two cells are now open or "connected"
-                         */
+                        // Draw south
+                        context.moveTo(x, this.squareHeight * 2);
+                        context.lineTo(this.squareWidth * 2, this.squareHeight * 2);
                     }
                     continue;
                 }
 
                 const randomNumber = getRandomNumber(0, 10);
                 if (randomNumber > 5) {
-                    // Erase North
-
+                    // draw west/east
                 } else {
-                    // Erase East
+                    // draw north/south
                 }
             }
         }
