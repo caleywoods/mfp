@@ -18,14 +18,37 @@
 import getRandomNumber from '../../utils/utils.js';
 
 class BinaryTree {
-    generate(nodes) {
-        for (let i = 0; i < nodes.length; i++) {
-            const randomNumber = this.getRandomNumber(0,10);
+    generate(grid) {
+        const visited = [];
+        for (let row = 0; i < grid.rows; row++) {
+            const northConstrained = row === 0;
+            for (let col = 0; i < grid.cols; col++) {
+                const eastConstrained = col === grid.cols - 1;
+                const cell = grid.cells[row][col];
+                visited.push(cell.id);
 
-            if (randomNumber > 5) {
-                // Erase North unless that makes an entrance or exit
-            } else {
-                // Erase East unless that makes an extrance of exit
+                if (northConstrained) {
+                    if (!eastConstrained) {
+                        // Erase east
+                        /**
+                         * - call clearRect at this cells x,y to totally clear that rectangle
+                         * - We also need to clearRect at the next cell to the right, otherwise we're left with the strokeWidth from that cell
+                         *   "blocking" our path
+                         * - We then need to use lineTo() to draw the North, West, and Southern "walls" back in place
+                         * - We also need to then use lineTo() to draw the North, East, and Southern "walls" of our cell to the East back in place
+                         *   we have to eliminate it's western wall so that the these two cells are now open or "connected"
+                         */
+                    }
+                    continue;
+                }
+
+                const randomNumber = getRandomNumber(0, 10);
+                if (randomNumber > 5) {
+                    // Erase North
+
+                } else {
+                    // Erase East
+                }
             }
         }
     }
