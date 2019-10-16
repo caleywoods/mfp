@@ -1,10 +1,10 @@
-import Node from './Node.js';
+import Cell from './Cell.js';
 
 export default class Grid {
     constructor(_rows, _cols, config = null) {
         this.cols = _cols;
         this.rows = _rows;
-        this.nodes = [];
+        this.cells = [];
 
         if (config) {
             Object.entries(config).forEach(entry => {
@@ -17,27 +17,27 @@ export default class Grid {
         this.buildGrid();
     }
 
-    // Build a 2D array to hold our node information
+    // Build a 2D array to hold our cell information
     buildGrid() {
         for (let row = 0; row < this.rows; row++) {
-            this.nodes[row] = [];
+            this.cells[row] = [];
             for (let col = 0; col < this.cols; col++) {
-                const node = new Node();
-                this.nodes[row][col] = node;
+                const cell = new Cell();
+                this.cells[row][col] = cell;
             }
         }
     }
 
     setStart(row, col) {
         // Subtract 1 from row and col to allow "human" input, meaning first row is 1, etc
-        const node = this.nodes[row - 1][col - 1];
-        node.isStart = true;
+        const cell = this.cells[row - 1][col - 1];
+        cell.isStart = true;
     }
 
     setEnd(row, col) {
         // Subtract 1 from row and col to allow "human" input, meaning first row is 1, etc
-        const node = this.nodes[row - 1][col - 1];
-        node.isEnd = true;
+        const cell = this.cells[row - 1][col - 1];
+        cell.isEnd = true;
     }
 
     // Actually draw our grid to the screen using Canvas API
@@ -69,11 +69,11 @@ export default class Grid {
                     y += 100;
                 }
 
-                const node = this.nodes[row][col];
-                if (node.isStart) {
+                const cell = this.cells[row][col];
+                if (cell.isStart) {
                     context.fillStyle = '#61D095';
                     context.fillRect(x + (context.lineWidth / 2), y + (context.lineWidth / 2), 100 - context.lineWidth, 100 - context.lineWidth);
-                } else if (node.isEnd) {
+                } else if (cell.isEnd) {
                     context.fillStyle = '#FB5D55';
                     context.fillRect(x, y, ...wh);
                 }
