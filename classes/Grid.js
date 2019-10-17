@@ -15,6 +15,8 @@ export default class Grid {
         }
 
         this.buildGrid();
+        this.configureCells();
+        console.log('Grid is done building: ', this);
     }
 
     // Build a 2D array to hold our cell information
@@ -23,13 +25,36 @@ export default class Grid {
         for (let row = 0; row < this.rows; row++) {
             this.cells[row] = [];
             for (let col = 0; col < this.cols; col++) {
-                const cell = new Cell(id);
+                const cell = new Cell(id, row, col);
                 this.cells[row][col] = cell;
                 id++;
             }
         }
+    }
 
-        console.log('Grid has been constructed');
+    // Set each cells neighbors
+    configureCells() {
+        for (let r = 0; r < this.rows; r++) {
+            for (let c = 0; c < this.cols; c++) {
+                const cell = this.cells[r][c];
+                const row = cell.row;
+                const col = cell.col;
+
+                cell.neighbors.north = this.getNeighbor(row - 1, col);
+                cell.neighbors.south = this.getNeighbor(row + 1, col);
+                cell.neighbors.west = this.getNeighbor(row, col - 1);
+                cell.neighbors.east = this.getNeighbor(row, col + 1);
+            }
+        }
+    }
+
+    // Protect from going out of bounds when accessing rows/cols
+    getNeighbor(row, col) {
+        if ((row < 0 || col < 0) || (row > this.rows - 1 || col > this.cols - 1)) {
+            return null;
+        }
+
+        return this.cells[row][col];
     }
 
     setStart(row, col) {

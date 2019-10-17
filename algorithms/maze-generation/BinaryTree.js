@@ -24,7 +24,6 @@ export default class BinaryTree extends Grid {
     }
 
     draw() {
-        console.log('Drawing Binary Tree');
         const visited = [];
         const maze_canvas = document.querySelector('#maze');
         const context = maze_canvas.getContext('2d');
@@ -66,30 +65,34 @@ export default class BinaryTree extends Grid {
                 // Draw western border
                 if (westConstrained) {
                     context.moveTo(this.squareWidth, this.squareHeight);
-                    context.lineTo(this.squareWidth, pixelsHigh)
+                    context.lineTo(this.squareWidth, pixelsHigh);
+                    //continue;
                 }
 
                 // Draw eastern border
                 if (eastConstrained) {
-                    context.moveTo(pixelsWide, this.squareHeight);
-                    context.lineTo(pixelsWide, pixelsHigh);
+                    //context.moveTo(pixelsWide, this.squareHeight);
+                    //context.lineTo(pixelsWide, pixelsHigh);
+                    //continue;
                 }
 
                 const cell = this.cells[row][col];
                 visited.push(cell.id);
 
-                if (northConstrained) {
-                    if (!eastConstrained) {
-                    }
-                    continue;
-                }
-
                 const randomNumber = getRandomNumber(0, 10);
                 context.moveTo(x, y);
                 if (randomNumber > 5) {
                     // draw west/east
+                    if (!southBorder && !northConstrained) {
+                        context.lineTo(x, y + this.squareHeight);
+                    }
                 } else {
                     // draw north/south
+                    if (!eastConstrained && !southBorder) {
+                        if (col !== this.cols - 2) {
+                            context.lineTo(x + this.squareWidth, y);
+                        }
+                    }
                 }
             }
         }
