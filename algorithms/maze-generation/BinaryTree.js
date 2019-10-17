@@ -29,10 +29,15 @@ export default class BinaryTree extends Grid {
         const wh = [100, 100];
 
         context.strokeStyle = '#222529';
+        context.moveTo(this.squareWidth, this.squareHeight);
         context.beginPath();
-        context.moveTo(50,50);
+        let x = 0;
+        let y = 0;
         for (let row = 0; row < this.rows; row++) {
+            x = this.squareWidth;
+            y += this.squareHeight;
             for (let col = 0; col < this.cols; col++) {
+                context.moveTo(x, y);
                 const cell = this.cells[row][col];
 
                 const cellNeighbors = [];
@@ -51,10 +56,53 @@ export default class BinaryTree extends Grid {
                 if (neighbor) {
                     cell.link(neighbor);
                 }
+
+                Object.entries(cell.neighbors).forEach(neighbor => {
+                    const [direction, neighborCell] = neighbor;
+
+                    // If there's no neighbor in this direction, we can draw a wall
+                    if (neighborCell === null) {
+                        switch(direction) {
+                            case 'north':
+                                context.lineTo(x + this.squareWidth, y);
+                                break;
+                            case 'east':
+                                context.moveTo(x + this.squareWidth,y);
+                                context.lineTo(x + (this.squareWidth) , y + this.squareHeight);
+                                break;
+                            case 'south':
+                                context.moveTo(x, y + this.squareHeight);
+                                context.lineTo(x + this.squareWidth, y + this.squareHeight);
+                                break;
+                            case 'west':
+                                context.moveTo(x, y);
+                                context.lineTo(x, y + this.squareHeight);
+                                break;
+                        }
+                    } else {
+                        // If the neighbor is not linked, stroke
+                        const drawWall = !cell.isLinked(neighborCell);
+
+                        if (drawWall) {
+                            switch(direction) {
+                                case 'north':
+                                    context.lineTo(x + this.squareWidth, y);
+                                    break;
+                                case 'east':
+                                    context.moveTo(x + this.squareWidth, y);
+                                    context.lineTo(x + (this.squareWidth), y + this.squareHeight);
+                                    break;
+
+                            }
+                        }
+                    }
+                });
+
+                x += this.squareWidth;
             }
         }
         console.log(this.cells);
-        // context.stroke();
+        context.stroke();
     }
 
 }
