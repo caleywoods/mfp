@@ -16,7 +16,6 @@ export default class Grid {
 
         this.buildGrid();
         this.configureCells();
-        console.log('Grid is done building: ', this);
     }
 
     // Build a 2D array to hold our cell information
