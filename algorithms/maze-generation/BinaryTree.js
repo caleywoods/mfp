@@ -45,7 +45,7 @@ export default class BinaryTree extends Grid {
                     cellNeighbors.push(cell.neighbors.east);
                 }
 
-                const idx = getRandomNumber(0, 1);
+                const idx = Math.floor(Math.random() * cellNeighbors.length);
                 const neighbor = cellNeighbors[idx];
 
                 if (neighbor) {
