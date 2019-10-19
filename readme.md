@@ -1,10 +1,11 @@
 # Mazes For Programmers
 
-This is a repo to hold code done in Typescript that represent the topics in the
-book [Mazes For Programmers](https://pragprog.com/book/jbmaze/mazes-for-programmers)
+This is a repo to hold code for the topics in the book
+[Mazes For Programmers](https://pragprog.com/book/jbmaze/mazes-for-programmers)
 by Jamis Buck.
 
-The original works in the book are implemented in Ruby.
+The original works in the book are implemented in Ruby. This project uses
+JS (Typescript soon) and the Canvas API to create the mazes.
 
 ![Binary Tree Generated Maze](https://i.imgur.com/D0SGdwd.png)
 
