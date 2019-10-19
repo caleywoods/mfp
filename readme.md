@@ -6,7 +6,7 @@ by Jamis Buck.
 
 The original works in the book are implemented in Ruby.
 
-[!Binary Tree Generated Maze](https://i.imgur.com/D0SGdwd.png)
+![Binary Tree Generated Maze](https://i.imgur.com/D0SGdwd.png)
 
 ## Running this repo
 * `git clone` this repo
