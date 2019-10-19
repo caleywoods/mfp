@@ -14,3 +14,5 @@ JS (Typescript soon) and the Canvas API to create the mazes.
 * make sure you have [http-server](https://www.npmjs.com/package/http-server) or some other way to serve the files locally
 * `cd` into the directory and run `http-server`, this starts a local http server usually on `http://localhost:8080`
 * browse to `http://localhost:8080/index.html` (if you configured a different port, use that)
+* If you'd like to make the mazes larger, play with the `gridConfig` variable in `app.js`
+    - You can increase or decrease the pixel size of the cells and increase or decrease the rows and columns in the maze
