@@ -7,7 +7,7 @@ const gridConfig = {
 };
 
 // const maze = new Grid(10, 10, gridConfig);
-const maze = new BinaryTree(90, 100, gridConfig);
+const maze = new BinaryTree(75, 100, gridConfig);
 // console.log(maze);
 
 // @TODO: Make these able to be set via mouse click
