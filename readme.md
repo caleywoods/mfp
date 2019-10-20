@@ -7,7 +7,7 @@ by Jamis Buck.
 The original works in the book are implemented in Ruby. This project uses
 JS (Typescript soon) and the Canvas API to create the mazes.
 
-![Binary Tree Generated Maze](https://i.imgur.com/D0SGdwd.png)
+![Maze Examples](https://i.imgur.com/LKWZHuR.png)
 
 ## Running this repo
 * `git clone` this repo
