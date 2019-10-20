@@ -8,10 +8,7 @@ const gridConfig = {
     squareWidth: 25
 };
 
-const maze = new BinaryTree(25, 35, gridConfig);
-
-// @TODO: Make these able to be set via mouse click
-// maze.setStart(4, 1);
-// maze.setEnd(1, 4);
+// const maze = new BinaryTree(25, 35, gridConfig);
+const maze = new Sidewinder(25, 35, gridConfig);
 
 maze.create();
