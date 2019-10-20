@@ -44,13 +44,17 @@ export default class Sidewinder extends Grid {
                     cell.link(cell.neighbors.east);
                 }
 
-                context.moveTo(x, y);
-
                 for (const entry of Object.entries(cell.neighbors)) {
-                    // Skip drawing walls for our cells that serve as entrances
-                    if (entrances.has(cell.id)) continue;
-
                     const [direction, neighborCell] = entry;
+
+                    // Skip drawing walls for our cells that serve as entrances
+                    if (entrances.has(cell.id)) {
+                        const entrance = entrances.get(cell.id);
+                        console.log(entrance);
+                        if (entrance === direction) {
+                            continue;
+                        }
+                    }
 
                     // If there's no neighbor in this direction, we can draw a wall
                     if (neighborCell === null) {
