@@ -1,4 +1,5 @@
 import Cell from './Cell.js';
+import { getRandomNumber } from '../../utils/utils.js';
 
 export default class Grid {
     constructor(_rows, _cols, config = null) {
@@ -115,5 +116,34 @@ export default class Grid {
                 }
             }
         }
+    }
+
+    /**
+     * Pick our entrances, either North/South or West/East
+     * Return a 2 element map where the key is a cell.id with a boolean true
+     * as the value just for quick lookup when drawing.
+     */
+    chooseEntrances() {
+        const borders = ['north', 'west'];
+        const entranceSides = [borders[Math.floor(Math.random() * borders.length)]];
+        const entrances = new Map();
+
+        if (entranceSides[0] === 'north') {
+            const northEntrance = getRandomNumber(0, this.cols - 1);
+            const southEntrance = getRandomNumber(0, this.cols - 1);
+            const northCell = this.cells[0][northEntrance];
+            const southCell = this.cells[this.rows -1][southEntrance];
+            entrances.set(northCell.id, 'north');
+            entrances.set(southCell.id, 'south');
+        } else {
+            const eastEntrance = getRandomNumber(0, this.rows - 1);
+            const westEntrance = getRandomNumber(0, this.rows - 1);
+            const eastCell = this.cells[eastEntrance][this.cols - 1];
+            const westCell = this.cells[westEntrance][0]
+            entrances.set(eastCell.id, 'east');
+            entrances.set(westCell.id, 'west');
+        }
+
+        return entrances;
     }
 }

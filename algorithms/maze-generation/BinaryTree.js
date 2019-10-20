@@ -12,8 +12,6 @@
  * very first row (Northernmost) is always empty as well as the last column
  * (Easternmost).
  */
-
-import { getRandomNumber } from '../../utils/utils.js';
 import Grid from '../../classes/Grid.js';
 
 export default class BinaryTree extends Grid {
@@ -104,34 +102,5 @@ export default class BinaryTree extends Grid {
             }
         }
         context.stroke();
-    }
-
-    /**
-     * Pick our entrances, either North/South or West/East
-     * Return a 2 element map where the key is a cell.id with a boolean true
-     * as the value just for quick lookup when drawing.
-     */
-    chooseEntrances() {
-        const borders = ['north', 'west'];
-        const entranceSides = [borders[Math.floor(Math.random() * borders.length)]];
-        const entrances = new Map();
-
-        if (entranceSides[0] === 'north') {
-            const northEntrance = getRandomNumber(0, this.cols - 1);
-            const southEntrance = getRandomNumber(0, this.cols - 1);
-            const northCell = this.cells[0][northEntrance];
-            const southCell = this.cells[this.rows -1][southEntrance];
-            entrances.set(northCell.id, true);
-            entrances.set(southCell.id, true);
-        } else {
-            const eastEntrance = getRandomNumber(0, this.rows - 1);
-            const westEntrance = getRandomNumber(0, this.rows - 1);
-            const eastCell = this.cells[eastEntrance][this.cols - 1];
-            const westCell = this.cells[westEntrance][0]
-            entrances.set(eastCell.id, true);
-            entrances.set(westCell.id, true);
-        }
-
-        return entrances;
     }
 }
