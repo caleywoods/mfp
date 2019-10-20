@@ -1,3 +1,15 @@
+/**
+ * In the Sidewinder algorithm, as we walk each cell we push it into an array
+ * which we call a run. We check at each cell whether we should close this run
+ * of cells, we always close the run when we reach the Eastern border.
+ *
+ * If we elect to close the run, we look back at all the cells in the run and
+ * choose one at random, from this random cell in our run we link to its
+ * northern neighbor (if we can) and then clear the run to start clean with the
+ * next cell.
+ *
+ * If we choose to continue the run then we link to the cells eastern neighbor.
+ */
 import { getRandomNumber } from '../../utils/utils.js';
 import Grid from '../../classes/Grid.js';
 

@@ -1,7 +1,7 @@
 /**
- * In this algorithm, for each cell in your grid you must decide whether to
- * create a link to the North or East neighbor. During the drawing process we
- * then skip drawing walls between linked neighbors.
+ * In the Binary Tree algorithm, for each cell in your grid you must decide
+ * whether to create a link to the North or East neighbor. During the drawing
+ * process we then skip drawing walls between linked neighbors.
  *
  * The exception to the above rule in the first pass is that we want to avoid
  * going "out of bounds" so if we're in a cell whose Eastern side is the edge
