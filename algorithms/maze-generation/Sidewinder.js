@@ -22,14 +22,18 @@ export default class Sidewinder extends Grid {
             y += this.squareHeight;
 
             let run = [];
+            if (row === 1) {
+                // debugger;
+            }
             for (let col = 0; col < this.cols; col++) {
                 const cell = this.cells[row][col];
+                context.moveTo(x, y);
 
                 run.push(cell);
 
                 const atEasternBorder = !cell.neighbors.east;
                 const atNorthernBorder = !cell.neighbors.north;
-                const shouldCloseRun = atEasternBorder || (!atNorthernBorder && getRandomNumber(0, 2) === 0);
+                const shouldCloseRun = atEasternBorder || (!atNorthernBorder && getRandomNumber(0, 1) === 0);
 
                 if (shouldCloseRun) {
                     const idx = Math.floor(Math.random() * run.length);
@@ -88,7 +92,6 @@ export default class Sidewinder extends Grid {
                                     context.moveTo(x + this.squareWidth, y);
                                     context.lineTo(x + (this.squareWidth), y + this.squareHeight);
                                     break;
-
                             }
                         }
                     }

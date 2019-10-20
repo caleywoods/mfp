@@ -19,25 +19,11 @@ export default class BinaryTree extends Grid {
         super(_rows, _cols, config);
     }
 
-    draw() {
-        const maze_canvas = document.querySelector('#maze');
-        const context = maze_canvas.getContext('2d');
-        const entrances = this.chooseEntrances();
-
-        context.strokeStyle = '#222529';
-        context.moveTo(this.squareWidth, this.squareHeight);
-        context.beginPath();
-        let x = 0;
-        let y = 0;
-
+    create() {
         for (let row = 0; row < this.rows; row++) {
-            x = this.squareWidth;
-            y += this.squareHeight;
             for (let col = 0; col < this.cols; col++) {
                 const cell = this.cells[row][col];
                 const cellNeighbors = [];
-
-                context.moveTo(x, y);
 
                 if (cell.neighbors.north) {
                     cellNeighbors.push(cell.neighbors.north);
@@ -53,60 +39,9 @@ export default class BinaryTree extends Grid {
                 if (neighbor) {
                     cell.link(neighbor);
                 }
-
-                for (const entry of Object.entries(cell.neighbors)) {
-                    const [direction, neighborCell] = entry;
-
-                    // Skip drawing walls for our cells that serve as entrances
-                    if (entrances.has(cell.id)) {
-                        const entrance = entrances.get(cell.id);
-                        console.log(entrance);
-                        if (entrance === direction) {
-                            continue;
-                        }
-                    }
-
-                    // If there's no neighbor in this direction, we can draw a wall
-                    if (neighborCell === null) {
-                        switch(direction) {
-                            case 'north':
-                                context.lineTo(x + this.squareWidth, y);
-                                break;
-                            case 'east':
-                                context.moveTo(x + this.squareWidth, y);
-                                context.lineTo(x + (this.squareWidth), y + this.squareHeight);
-                                break;
-                            case 'south':
-                                context.moveTo(x, y + this.squareHeight);
-                                context.lineTo(x + this.squareWidth, y + this.squareHeight);
-                                break;
-                            case 'west':
-                                context.moveTo(x, y);
-                                context.lineTo(x, y + this.squareHeight);
-                                break;
-                        }
-                    } else {
-                        // If the neighbor is not linked, stroke
-                        const drawWall = !cell.isLinked(neighborCell);
-
-                        if (drawWall) {
-                            switch(direction) {
-                                case 'north':
-                                    context.lineTo(x + this.squareWidth, y);
-                                    break;
-                                case 'east':
-                                    context.moveTo(x + this.squareWidth, y);
-                                    context.lineTo(x + (this.squareWidth), y + this.squareHeight);
-                                    break;
-
-                            }
-                        }
-                    }
-                }
-
-                x += this.squareWidth;
             }
         }
-        context.stroke();
+
+        this.draw();
     }
 }
