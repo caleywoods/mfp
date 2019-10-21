@@ -6,6 +6,7 @@ export default class Grid {
         this.cols = _cols;
         this.rows = _rows;
         this.cells = [];
+        this.entrances = new Map();
 
         if (config) {
             Object.entries(config).forEach(entry => {
@@ -119,7 +120,7 @@ export default class Grid {
 
     // Actually draw our grid to the screen using Canvas API
     draw() {
-        const entrances = this.chooseEntrances();
+        this.chooseEntrances();
         const maze_canvas = document.querySelector('#maze');
         const context = maze_canvas.getContext('2d');
 
@@ -135,15 +136,15 @@ export default class Grid {
 
             for (let col = 0; col < this.cols; col++) {
                 const cell = this.cells[row][col];
-                console.log(cell);
                 context.moveTo(x,y);
 
                 for (const entry of Object.entries(cell.neighbors)) {
                     const [direction, neighborCell] = entry;
 
                     // Skip drawing walls for our cells that serve as entrances
-                    if (entrances.has(cell.id)) {
-                        const entrance = entrances.get(cell.id);
+                    if (this.entrances.has(cell.id)) {
+                        let entrance = this.entrances.get(cell.id);
+                        entrance = entrance.direction;
                         if (entrance === direction) {
                             continue;
                         }
@@ -201,24 +202,21 @@ export default class Grid {
     chooseEntrances() {
         const borders = ['north', 'west'];
         const entranceSides = [borders[Math.floor(Math.random() * borders.length)]];
-        const entrances = new Map();
 
         if (entranceSides[0] === 'north') {
             const northEntrance = getRandomNumber(0, this.cols - 1);
             const southEntrance = getRandomNumber(0, this.cols - 1);
             const northCell = this.cells[0][northEntrance];
             const southCell = this.cells[this.rows -1][southEntrance];
-            entrances.set(northCell.id, 'north');
-            entrances.set(southCell.id, 'south');
+            this.entrances.set(northCell.id, {direction: 'north', cell: northCell});
+            this.entrances.set(southCell.id, {direction: 'south', cell: southCell});
         } else {
             const eastEntrance = getRandomNumber(0, this.rows - 1);
             const westEntrance = getRandomNumber(0, this.rows - 1);
             const eastCell = this.cells[eastEntrance][this.cols - 1];
             const westCell = this.cells[westEntrance][0]
-            entrances.set(eastCell.id, 'east');
-            entrances.set(westCell.id, 'west');
+            this.entrances.set(eastCell.id, {direction: 'east', cell: eastCell});
+            this.entrances.set(westCell.id, {direction: 'west', cell: westCell});
         }
-
-        return entrances;
     }
 }
