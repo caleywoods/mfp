@@ -116,6 +116,7 @@ export default class Grid {
                 }
             }
         }
+
     }
 
     // Actually draw our grid to the screen using Canvas API
@@ -227,6 +228,8 @@ export default class Grid {
             const southEntrance = getRandomNumber(0, this.cols - 1);
             const northCell = this.cells[0][northEntrance];
             const southCell = this.cells[this.rows -1][southEntrance];
+            northCell.isStart = true;
+            southCell.isEnd = true;
             this.entrances.set(northCell.id, {direction: 'north', cell: northCell});
             this.entrances.set(southCell.id, {direction: 'south', cell: southCell});
         } else {
@@ -234,8 +237,10 @@ export default class Grid {
             const westEntrance = getRandomNumber(0, this.rows - 1);
             const eastCell = this.cells[eastEntrance][this.cols - 1];
             const westCell = this.cells[westEntrance][0]
-            this.entrances.set(eastCell.id, {direction: 'east', cell: eastCell});
+            westCell.isStart = true;
+            eastCell.isEnd = true;
             this.entrances.set(westCell.id, {direction: 'west', cell: westCell});
+            this.entrances.set(eastCell.id, {direction: 'east', cell: eastCell});
         }
     }
 }
