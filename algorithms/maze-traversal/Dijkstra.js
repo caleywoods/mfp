@@ -55,6 +55,11 @@ export default class Dijkstra extends Walker {
                 this.assignDistance(link, startDistance + 1, false);
             }
         }
+
+        if (this.showWeightedScores) {
+            this.context.fillStyle = '#61D095';
+            this.context.globalAlpha = .6;
+        }
     }
 
     fillShortestPath(cell, targetScore) {
