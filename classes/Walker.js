@@ -3,7 +3,7 @@ export default class Walker {
         this.grid = _grid;
 
         if (_config) {
-            Object.entries(config).forEach(entry => {
+            Object.entries(_config).forEach(entry => {
                 const [prop, val] = entry;
 
                 this[prop] = val;
