@@ -6,12 +6,15 @@ import Dijkstra from './algorithms/maze-traversal/Dijkstra.js';
 // Cell size in pixels
 const gridConfig = {
     showIDs: false,
-    squareHeight: 25,
-    squareWidth: 25
+    squareHeight: 15,
+    squareWidth: 15
 };
 
-// const maze = new BinaryTree(175, 300, gridConfig);
-const maze = new Sidewinder(10, 10, gridConfig);
+const maze = new Sidewinder(40, 40, gridConfig);
+
+const solverConfig = {
+    showWeightedScores: false
+};
 
 maze.create();
-const solver = new Dijkstra(maze);
+const solver = new Dijkstra(maze, solverConfig);
