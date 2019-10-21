@@ -30,7 +30,7 @@ export default class Dijkstra extends Walker {
         this.fillShortestPath(endCell, endScore - 1);
     }
 
-    assignDistance(cell, startDistance, startCell = false) {
+    assignDistance(cell, startDistance) {
         if (!this.visited.has(cell.id)) {
             this.visited.set(cell.id, startDistance);
             for (const link of cell.links.keys()) {
