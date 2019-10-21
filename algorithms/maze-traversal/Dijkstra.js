@@ -63,16 +63,16 @@ export default class Dijkstra extends Walker {
     }
 
     fillShortestPath(cell, targetScore) {
-        if (cell.isStart) {
+        if (cell.isEnd) {
             const x = (this.grid.squareWidth * cell.col) + this.grid.squareWidth;
             const y = (this.grid.squareHeight * cell.row) + this.grid.squareHeight;
-            this.context.fillRect(x + 1, y - 1, this.grid.squareWidth, this.grid.squareHeight);
+            this.context.fillRect(x + 1, y + 1, this.grid.squareWidth, this.grid.squareHeight);
         }
         for (let link of cell.links) {
             [link] = link
             const cellScore = this.visited.get(link.id);
-            const x = (this.grid.squareWidth * cell.col + 1) + this.grid.squareWidth;
-            const y = (this.grid.squareHeight * cell.row + 1) + this.grid.squareHeight;
+            const x = (this.grid.squareWidth * link.col + 1) + this.grid.squareWidth;
+            const y = (this.grid.squareHeight * link.row + 1) + this.grid.squareHeight;
             if (cellScore === targetScore) {
                 this.context.fillRect(x, y, this.grid.squareWidth, this.grid.squareHeight);
                 this.fillShortestPath(link, targetScore - 1);
