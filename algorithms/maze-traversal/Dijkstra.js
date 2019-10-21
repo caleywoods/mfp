@@ -1,8 +1,8 @@
 import Walker from '../../classes/Walker.js';
 
 export default class Dijkstra extends Walker {
-    constructor(_grid, _solutionColor) {
-        super(_grid);
+    constructor(_grid, _config) {
+        super(_grid, _config);
         this.visited = new Map();
         this.canvas = document.querySelector('#maze');
         this.context = this.canvas.getContext('2d');
