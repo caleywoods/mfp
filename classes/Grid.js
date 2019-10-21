@@ -138,6 +138,25 @@ export default class Grid {
                 const cell = this.cells[row][col];
                 context.moveTo(x,y);
 
+                // Fill our cells with an ID for easy....well ID
+                if (this.showIDs) {
+                    if (cell.isStart) {
+                        context.fillStyle = '#61D095';
+                    } else if (cell.isEnd) {
+                        context.fillStyle = '#FB5D55';
+                    } else {
+                        context.fillStyle = '#222529';
+                    }
+
+                    if (cell.id > 99) {
+                        context.fillText(cell.id, x + this.squareWidth * .15, y + this.squareHeight * .65);
+                    } else if (cell.id > 9) {
+                        context.fillText(cell.id, x + this.squareWidth * .285, y + this.squareHeight * .65);
+                    } else {
+                        context.fillText(cell.id, x + this.squareWidth * .4, y + this.squareHeight * .65);
+                    }
+                }
+
                 for (const entry of Object.entries(cell.neighbors)) {
                     const [direction, neighborCell] = entry;
 
