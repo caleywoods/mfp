@@ -8,6 +8,7 @@ export default class Dijkstra extends Walker {
         this.context = this.canvas.getContext('2d');
         this.context.fillStyle = '#61D095';
         this.context.globalAlpha = .6;
+        this.stagger = 100;
         this.solve();
     }
 
@@ -74,7 +75,14 @@ export default class Dijkstra extends Walker {
             const x = (this.grid.squareWidth * link.col + 1) + this.grid.squareWidth;
             const y = (this.grid.squareHeight * link.row + 1) + this.grid.squareHeight;
             if (cellScore === targetScore) {
-                this.context.fillRect(x, y, this.grid.squareWidth, this.grid.squareHeight);
+                if (this.slowMo) {
+                    setTimeout(() => {
+                        this.context.fillRect(x, y, this.grid.squareWidth, this.grid.squareHeight);
+                    }, this.stagger);
+                    this.stagger += 100;
+                } else {
+                    this.context.fillRect(x, y, this.grid.squareWidth, this.grid.squareHeight);
+                }
                 this.fillShortestPath(link, targetScore - 1);
             }
         }
