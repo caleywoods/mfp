@@ -6,6 +6,7 @@ export default class Grid {
         this.cols = _cols;
         this.rows = _rows;
         this.cells = [];
+        this.gridCells = new Map();
         this.entrances = new Map();
 
         if (config) {
@@ -28,6 +29,7 @@ export default class Grid {
             for (let col = 0; col < this.cols; col++) {
                 const cell = new Cell(id, row, col);
                 this.cells[row][col] = cell;
+                this.gridCells.set(cell.id, cell);
                 id++;
             }
         }
