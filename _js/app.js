@@ -1,9 +1,9 @@
-import AldousBroder from './algorithms/maze-generation/AldousBroder.js';
-import BinaryTree from './algorithms/maze-generation/BinaryTree.js';
-import Dijkstra from './algorithms/maze-traversal/Dijkstra.js';
-import Grid from './classes/Grid.js';
-import Sidewinder from './algorithms/maze-generation/Sidewinder.js';
-import Wilson from './algorithms/maze-generation/Wilson.js';
+import AldousBroder from '../algorithms/maze-generation/AldousBroder.js';
+import BinaryTree from '../algorithms/maze-generation/BinaryTree.js';
+import Dijkstra from '../algorithms/maze-traversal/Dijkstra.js';
+import Grid from '../classes/Grid.js';
+import Sidewinder from '../algorithms/maze-generation/Sidewinder.js';
+import Wilson from '../algorithms/maze-generation/Wilson.js';
 
 // Cell size in pixels
 const gridConfig = {
@@ -12,7 +12,7 @@ const gridConfig = {
     squareWidth: 30
 };
 
-const maze = new Wilson(20, 20, gridConfig);
+const maze = new Wilson(30, 45, gridConfig);
 
 const solverConfig = {
     showWeightedScores: false,
