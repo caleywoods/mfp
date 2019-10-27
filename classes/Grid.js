@@ -1,5 +1,5 @@
 import Cell from './Cell.js';
-import { getRandomNumber } from '../../utils/utils.js';
+import { getRandomNumber } from '../utils/utils.js';
 
 export default class Grid {
     constructor(_rows, _cols, config = null) {
