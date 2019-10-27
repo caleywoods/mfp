@@ -2,7 +2,7 @@
   "name": "mfp",
   "version": "1.0.0",
   "description": "Mazes for programmers",
-  "main": "app.js",
+  "private": true,
   "scripts": {
     "css-deploy": "npm run css-build && npm run css-postcss",
     "css-build": "node-sass _sass/main.scss css/main.css",
