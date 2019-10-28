@@ -9,7 +9,39 @@
         <link rel="stylesheet" href="dist/css/main.css">
     </head>
     <body>
-        <button id='save-maze-btn'>Save To Image</button>
+        <nav class="navbar is-light">
+            <div class="navbar-brand">
+                <a class="navbar-item logo" href="http://localhost:8080/index.html">
+                    <img src="logo.png" />
+                    <span class="brand-text">MFP</span>
+                </a>
+            </div>
+            <div class="navbar-menu">
+                <div class="navbar-start">
+                    <div class="navbar-item has-dropdown is-hoverable">
+                        <a class="navbar-link">Generator Algorithms</a>
+                        <div class="navbar-dropdown">
+                            <a class="navbar-item">Aldous Broder</a>
+                            <a class="navbar-item">Binary Tree</a>
+                            <a class="navbar-item">Sidewinder</a>
+                            <a class="navbar-item is-active">Wilson</a>
+                        </div>
+                    </div>
+                    <div class="navbar-item has-dropdown is-hoverable">
+                        <a class="navbar-link">Solution Algorithms</a>
+                        <div class="navbar-dropdown">
+                            <a class="navbar-item is-active">Dijkstra</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="navbar-end">
+                    <div class="field is-grouped">
+                        <p class="control"><a class="button" id="solve-btn"><span>Solve</span></a></p>
+                        <p class="control"><a class="button is-success" id="generate-btn"><span>Generate</span></a></p>
+                    </div>
+                </div>
+            </div>
+        </nav>
         <canvas id="maze" width="1900" height="950"></canvas>
         <script src="dist/js/app.js" type="module"></script>
         <footer>

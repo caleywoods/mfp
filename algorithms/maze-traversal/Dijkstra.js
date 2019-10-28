@@ -21,6 +21,7 @@ export default class Dijkstra extends Walker {
          *     that we can get the row and column number to start at and the row
          *     and column of our finishing cell.
          */
+        console.log('Grid: ', this.grid);
         const [start, end] = Array.from(this.grid.entrances.entries());
         const {cell: startCell} = start[1];
         const {cell: endCell} = end[1];
