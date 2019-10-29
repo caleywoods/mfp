@@ -9,7 +9,7 @@
         <link rel="stylesheet" href="dist/css/main.css">
     </head>
     <body>
-        <nav class="navbar is-light">
+        <nav class="navbar is-dark">
             <div class="navbar-brand">
                 <a class="navbar-item logo" href="http://localhost:8080/index.html">
                     <img src="logo.png" />
@@ -18,31 +18,147 @@
             </div>
             <div class="navbar-menu">
                 <div class="navbar-start">
-                    <div class="navbar-item has-dropdown is-hoverable">
-                        <a class="navbar-link">Generator Algorithms</a>
-                        <div class="navbar-dropdown">
-                            <a class="navbar-item">Aldous Broder</a>
-                            <a class="navbar-item">Binary Tree</a>
-                            <a class="navbar-item">Sidewinder</a>
-                            <a class="navbar-item is-active">Wilson</a>
-                        </div>
-                    </div>
-                    <div class="navbar-item has-dropdown is-hoverable">
-                        <a class="navbar-link">Solution Algorithms</a>
-                        <div class="navbar-dropdown">
-                            <a class="navbar-item is-active">Dijkstra</a>
-                        </div>
-                    </div>
+                    <a class="navbar-item" id="options-btn">Options</a>
                 </div>
                 <div class="navbar-end">
-                    <div class="field is-grouped">
-                        <p class="control"><a class="button" id="solve-btn"><span>Solve</span></a></p>
-                        <p class="control"><a class="button is-success" id="generate-btn"><span>Generate</span></a></p>
+                    <div class="navbar-item">
+                        <div class="buttons">
+                            <a class="button is-primary" id="generate-btn">
+                                Generate
+                            </a>
+                            <a class="button is-light" id="solve-btn">
+                                Solve
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
         </nav>
-        <canvas id="maze" width="1900" height="950"></canvas>
+        <div id="canvas-container">
+            <canvas id="maze" width="1900" height="950"></canvas>
+        </div>
+        <div class="modal">
+            <div class="modal-background"></div>
+                <div class="modal-card">
+                    <header class="modal-card-head">
+                        <p class="modal-card-title">Configuration Options</p>
+                        <button class="delete" aria-label="close"></button>
+                    </header>
+                    <section class="modal-card-body">
+                        <div class="content">
+                            <h2 class="modal-hdr">Maze Options</h2>
+                                <div class="field">
+                                    <label class="label">Generation Algorithm</label>
+                                    <div class="control">
+                                        <div class="select">
+                                            <select id="maze-gen-algo">
+                                                <option>Aldous Broder</option>
+                                                <option>Binary Tree</option>
+                                                <option>Sidewinder</option>
+                                                <option selected="selected">Wilson</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <div class="control">
+                                        <input class="input is-primary" id="rows" type="number" placeholder="number of rows">
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <div class="control">
+                                        <input class="input is-primary" id="cols" type="number" placeholder="number of columns">
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <div class="control">
+                                        <input class="input is-primary" id="cell-pixel-size" type="number" placeholder="cell pixel size">
+                                    </div>
+                                </div>
+                                <div class="field is-grouped">
+                                    <p class="control">
+                                        <a class="button cell-size-increase" data-amount="5">
+                                            Five
+                                        </a>
+                                    </p>
+                                    <p class="control">
+                                        <a class="button cell-size-increase" data-amount="10">
+                                            Ten
+                                        </a>
+                                    </p>
+                                    <p class="control">
+                                        <a class="button cell-size-increase" data-amount="15">
+                                            Fifteen
+                                        </a>
+                                    </p>
+                                    <p class="control">
+                                        <a class="button cell-size-increase" data-amount="20">
+                                            Twenty
+                                        </a>
+                                    </p>
+                                    <p class="control">
+                                        <a class="button cell-size-increase" data-amount="30">
+                                            Thirty
+                                        </a>
+                                    </p>
+                                    <p class="control">
+                                        <a class="button cell-size-increase" data-amount="40">
+                                            Forty
+                                        </a>
+                                    </p>
+                                </div>
+                                <div class="field">
+                                    <label class="checkbox">
+                                        <input type="checkbox" id="show-ids">
+                                        Show Cell IDs
+                                    </label>
+                                </div>
+                                <hr />
+                            <h2 class="modal-hdr">Solution Options</h2>
+                                <div class="field">
+                                    <label class="label">Solution Algorithm</label>
+                                    <div class="control">
+                                        <div class="select">
+                                            <select>
+                                                <option>Dijkstra</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="label">Solution Draw Speed</label>
+                                    <div class="control">
+                                        <div class="select">
+                                            <select id="solve-speed">
+                                                <option selected="selected">Sloth-like</option>
+                                                <option selected="selected">Slow</option>
+                                                <option>Medium</option>
+                                                <option>Fast</option>
+                                                <option>Ludicrous</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="checkbox">
+                                        <input type="checkbox" id="slow-mode" checked="true">
+                                        Slow mode
+                                    </label>
+                                </div>
+                                <div class="field">
+                                    <label class="checkbox">
+                                        <input type="checkbox" id="show-weights">
+                                        Show cell solution weights
+                                    </label>
+                                </div>
+                        </div>
+                    </section>
+                    <footer class="modal-card-foot">
+                            <button class="button is-success" id="save-options-btn">Save & Generate</button>
+                            <button class="button" id="cancel-options-btn">Cancel</button>
+                    </footer>
+                </div>
+            </div>
         <script src="dist/js/app.js" type="module"></script>
         <footer>
         </footer>

@@ -11,7 +11,7 @@
     "deploy": "npm run css-deploy && npm run js-build",
     "js-build": "babel src/js --out-dir dist/js",
     "js-watch": "npm run js-build -- --watch",
-    "start": "npm-run-all --parallel css-watch js-watch",
+    "start": "webpack && npm run css-build",
     "test": "jest"
   },
   "repository": {

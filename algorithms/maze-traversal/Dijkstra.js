@@ -8,7 +8,7 @@ export default class Dijkstra extends Walker {
         this.context = this.canvas.getContext('2d');
         this.context.fillStyle = '#61D095';
         this.context.globalAlpha = .6;
-        this.stagger = 100;
+        this.stagger = this.drawSpeed;
         this.solve();
     }
 
@@ -80,7 +80,7 @@ export default class Dijkstra extends Walker {
                     setTimeout(() => {
                         this.context.fillRect(x, y, this.grid.squareWidth, this.grid.squareHeight);
                     }, this.stagger);
-                    this.stagger += 100;
+                    this.stagger += this.drawSpeed;
                 } else {
                     this.context.fillRect(x, y, this.grid.squareWidth, this.grid.squareHeight);
                 }

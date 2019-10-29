@@ -1,3 +1,15 @@
 @charset "utf-8";
 
 @import "../../node_modules/bulma/bulma";
+
+.navbar-brand {
+    .brand-text {
+        margin-left: .5em;
+    }
+}
+
+.content {
+    h2.modal-hdr {
+        margin-bottom: .75em;
+    }
+}
