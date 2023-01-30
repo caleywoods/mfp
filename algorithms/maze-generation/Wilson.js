@@ -49,5 +49,4 @@ export default class Wilson extends Grid {
 
         this.draw();
     }
-
 }
