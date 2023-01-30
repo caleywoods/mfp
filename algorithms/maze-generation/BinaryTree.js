@@ -42,6 +42,7 @@ export default class BinaryTree extends Grid {
             }
         }
 
+        // Test comment to see if this commit is properly mirrored to GitHub
         this.draw();
     }
 }
