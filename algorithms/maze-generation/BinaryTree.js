@@ -1,3 +1,4 @@
+
 /**
  * In the Binary Tree algorithm, for each cell in your grid you must decide
  * whether to create a link to the North or East neighbor. During the drawing
@@ -42,6 +43,7 @@ export default class BinaryTree extends Grid {
             }
         }
 
+        // Comment to test commit signing in Gitlab
         // Test comment to see if this commit is properly mirrored to GitHub
         this.draw();
     }
