@@ -46,6 +46,7 @@ export default class Sidewinder extends Grid {
             }
         }
 
+        // Comment to test full commit signing
         this.draw();
     }
 }
