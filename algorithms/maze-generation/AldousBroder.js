@@ -26,6 +26,7 @@ export default class AldousBroder extends Grid {
             cell = neighbor;
         }
 
+        // Testing signed commits
         this.draw();
     }
 
