@@ -1,5 +1,6 @@
 import Walker from '../../classes/Walker.js';
 
+// Test comment for testing mirroring with priv GL repo
 export default class Dijkstra extends Walker {
     constructor(_grid, _config) {
         super(_grid, _config);
