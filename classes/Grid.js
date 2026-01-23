@@ -47,6 +47,9 @@ export default class Grid {
                 cell.neighbors.south = this.getNeighbor(row + 1, col);
                 cell.neighbors.west = this.getNeighbor(row, col - 1);
                 cell.neighbors.east = this.getNeighbor(row, col + 1);
+
+                // Cache non-null neighbors for some of the algorithms to use
+                cell.validNeighbors = Object.values(cell.neighbors).filter(n => n);
             }
         }
     }

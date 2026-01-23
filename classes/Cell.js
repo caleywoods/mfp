@@ -12,6 +12,7 @@ export default class Cell {
         this.row = row;
         this.col = col;
         this.links = new Map();
+        this.validNeighbors = [];
     }
 
     link(cell, bidirectional = true) {
