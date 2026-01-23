@@ -139,6 +139,8 @@ export default class Grid {
 
             for (let col = 0; col < this.cols; col++) {
                 const cell = this.cells[row][col];
+                const entrance = this.entrances.get(cell.id);
+                const entranceDirection = entrance ? entrance.direction : null;
                 context.moveTo(x,y);
 
                 // Fill our cells with an ID for easy....well ID
@@ -164,10 +166,8 @@ export default class Grid {
                     const [direction, neighborCell] = entry;
 
                     // Skip drawing walls for our cells that serve as entrances
-                    if (this.entrances.has(cell.id)) {
-                        let entrance = this.entrances.get(cell.id);
-                        entrance = entrance.direction;
-                        if (entrance === direction) {
+                    if (entrance) {
+                        if (entranceDirection === direction) {
                             continue;
                         }
                     }
