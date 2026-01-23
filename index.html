@@ -8,50 +8,46 @@
         <title>Mazes For Programmers</title>
         <link rel="stylesheet" href="/src/sass/main.scss">
     </head>
-    <body>
-        <nav class="navbar is-dark">
-            <div class="navbar-brand">
-                <a class="navbar-item logo" href="/">
-                    <img src="logo.png" />
-                    <span class="brand-text">MFP</span>
+    <body class="min-h-screen bg-white text-slate-900">
+        <header class="border-b border-slate-200 bg-[#222529] text-white">
+            <div class="mx-auto flex max-w-[1600px] items-center justify-between px-4 py-3">
+                <a class="flex items-center gap-2" href="/">
+                    <img src="logo.png" class="h-6 w-6" />
+                    <span class="text-sm font-semibold tracking-wide">MFP</span>
                 </a>
-            </div>
-            <div class="navbar-menu">
-                <div class="navbar-start">
-                    <a class="navbar-item" id="options-btn">Options</a>
-                </div>
-                <div class="navbar-end">
-                    <div class="navbar-item">
-                        <div class="buttons">
-                            <a class="button is-primary" id="generate-btn">
-                                Generate
-                            </a>
-                            <a class="button is-light" id="solve-btn">
-                                Solve
-                            </a>
-                        </div>
+                <div class="flex items-center gap-3">
+                    <button id="options-btn" class="text-sm font-medium text-white/90 hover:text-white">Options</button>
+                    <div class="flex items-center gap-2">
+                        <button id="generate-btn" class="rounded-md bg-emerald-600 px-3 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400">Generate</button>
+                        <button id="solve-btn" class="rounded-md bg-white/10 px-3 py-3 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-white/20 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/40">Solve</button>
                     </div>
                 </div>
             </div>
-        </nav>
-        <div id="canvas-container">
-            <canvas id="maze" width="1900" height="950"></canvas>
-        </div>
-        <div class="modal">
-            <div class="modal-background"></div>
-                <div class="modal-card">
-                    <header class="modal-card-head">
-                        <p class="modal-card-title">Configuration Options</p>
-                        <button class="delete" aria-label="close"></button>
+        </header>
+        <main class="p-1">
+            <div id="canvas-container" class="overflow-auto">
+                <canvas id="maze" width="1900" height="950" class="block bg-white"></canvas>
+            </div>
+        </main>
+
+        <div class="modal fixed inset-0 z-50 hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <div class="modal-background absolute inset-0 bg-black/50"></div>
+            <div class="relative flex min-h-full items-start justify-center p-4 sm:p-8">
+                <div class="modal-card w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-xl ring-1 ring-black/10">
+                    <header class="modal-card-head flex items-center justify-between border-b border-slate-200 px-6 py-4">
+                        <p id="modal-title" class="text-xl font-semibold text-slate-900">Configuration Options</p>
+                        <button class="delete inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700" aria-label="close" type="button">×</button>
                     </header>
-                    <section class="modal-card-body">
-                        <div class="content">
-                            <h2 class="modal-hdr">Maze Options</h2>
-                                <div class="field">
-                                    <label class="label">Generation Algorithm</label>
-                                    <div class="control">
-                                        <div class="select">
-                                            <select id="maze-gen-algo">
+                    <section class="modal-card-body px-6 py-6">
+                        <div class="content space-y-8">
+                            <div>
+                                <h2 class="modal-hdr mb-4 text-2xl font-semibold text-slate-900">Maze Options</h2>
+
+                                <div class="space-y-4">
+                                    <div class="field space-y-2">
+                                        <label class="label text-sm font-semibold text-slate-800">Generation Algorithm</label>
+                                        <div class="control">
+                                            <select id="maze-gen-algo" class="w-56 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
                                                 <option>Aldous Broder</option>
                                                 <option>Binary Tree</option>
                                                 <option>Sidewinder</option>
@@ -59,77 +55,61 @@
                                             </select>
                                         </div>
                                     </div>
-                                </div>
-                                <div class="field">
-                                    <div class="control">
-                                        <input class="input is-primary" id="rows" type="number" placeholder="number of rows">
+
+                                    <div class="field">
+                                        <div class="control">
+                                            <input class="input w-full rounded-md border border-emerald-400 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200" id="rows" type="number" placeholder="number of rows">
+                                        </div>
+                                    </div>
+                                    <div class="field">
+                                        <div class="control">
+                                            <input class="input w-full rounded-md border border-emerald-400 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200" id="cols" type="number" placeholder="number of columns">
+                                        </div>
+                                    </div>
+                                    <div class="field">
+                                        <div class="control">
+                                            <input class="input w-full rounded-md border border-emerald-400 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200" id="cell-pixel-size" type="number" placeholder="cell pixel size">
+                                        </div>
+                                    </div>
+
+                                    <div class="field">
+                                        <div class="flex flex-wrap gap-2">
+                                            <button type="button" class="button cell-size-increase rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50" data-amount="5">Five</button>
+                                            <button type="button" class="button cell-size-increase rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50" data-amount="10">Ten</button>
+                                            <button type="button" class="button cell-size-increase rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50" data-amount="15">Fifteen</button>
+                                            <button type="button" class="button cell-size-increase rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50" data-amount="20">Twenty</button>
+                                            <button type="button" class="button cell-size-increase rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50" data-amount="30">Thirty</button>
+                                            <button type="button" class="button cell-size-increase rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50" data-amount="40">Forty</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="field">
+                                        <label class="checkbox flex items-center gap-2 text-sm text-slate-800">
+                                            <input type="checkbox" id="show-ids" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-200">
+                                            Show Cell IDs
+                                        </label>
                                     </div>
                                 </div>
-                                <div class="field">
-                                    <div class="control">
-                                        <input class="input is-primary" id="cols" type="number" placeholder="number of columns">
-                                    </div>
-                                </div>
-                                <div class="field">
-                                    <div class="control">
-                                        <input class="input is-primary" id="cell-pixel-size" type="number" placeholder="cell pixel size">
-                                    </div>
-                                </div>
-                                <div class="field is-grouped">
-                                    <p class="control">
-                                        <a class="button cell-size-increase" data-amount="5">
-                                            Five
-                                        </a>
-                                    </p>
-                                    <p class="control">
-                                        <a class="button cell-size-increase" data-amount="10">
-                                            Ten
-                                        </a>
-                                    </p>
-                                    <p class="control">
-                                        <a class="button cell-size-increase" data-amount="15">
-                                            Fifteen
-                                        </a>
-                                    </p>
-                                    <p class="control">
-                                        <a class="button cell-size-increase" data-amount="20">
-                                            Twenty
-                                        </a>
-                                    </p>
-                                    <p class="control">
-                                        <a class="button cell-size-increase" data-amount="30">
-                                            Thirty
-                                        </a>
-                                    </p>
-                                    <p class="control">
-                                        <a class="button cell-size-increase" data-amount="40">
-                                            Forty
-                                        </a>
-                                    </p>
-                                </div>
-                                <div class="field">
-                                    <label class="checkbox">
-                                        <input type="checkbox" id="show-ids">
-                                        Show Cell IDs
-                                    </label>
-                                </div>
-                                <hr />
-                            <h2 class="modal-hdr">Solution Options</h2>
-                                <div class="field">
-                                    <label class="label">Solution Algorithm</label>
-                                    <div class="control">
-                                        <div class="select">
-                                            <select>
+                            </div>
+
+                            <hr class="border-slate-200" />
+
+                            <div>
+                                <h2 class="modal-hdr mb-4 text-2xl font-semibold text-slate-900">Solution Options</h2>
+
+                                <div class="space-y-4">
+                                    <div class="field space-y-2">
+                                        <label class="label text-sm font-semibold text-slate-800">Solution Algorithm</label>
+                                        <div class="control">
+                                            <select class="w-56 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
                                                 <option>Dijkstra</option>
                                             </select>
                                         </div>
                                     </div>
-                                </div>
-                                <div class="field">
-                                    <label class="label">Solution Draw Speed</label>
-                                    <div class="control">
-                                        <div class="select">
-                                            <select id="solve-speed">
+                                    <div class="field space-y-2">
+                                        <label class="label text-sm font-semibold text-slate-800">Solution Draw Speed</label>
+                                        <div class="control">
+                                            <select id="solve-speed" class="w-56 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200">
                                                 <option selected="selected">Sloth-like</option>
                                                 <option selected="selected">Slow</option>
                                                 <option>Medium</option>
@@ -138,27 +118,30 @@
                                             </select>
                                         </div>
                                     </div>
+
+                                    <div class="field">
+                                        <label class="checkbox flex items-center gap-2 text-sm text-slate-800">
+                                            <input type="checkbox" id="slow-mode" checked="true" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-200">
+                                            Slow mode
+                                        </label>
+                                    </div>
+                                    <div class="field">
+                                        <label class="checkbox flex items-center gap-2 text-sm text-slate-800">
+                                            <input type="checkbox" id="show-weights" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-200">
+                                            Show cell solution weights
+                                        </label>
+                                    </div>
                                 </div>
-                                <div class="field">
-                                    <label class="checkbox">
-                                        <input type="checkbox" id="slow-mode" checked="true">
-                                        Slow mode
-                                    </label>
-                                </div>
-                                <div class="field">
-                                    <label class="checkbox">
-                                        <input type="checkbox" id="show-weights">
-                                        Show cell solution weights
-                                    </label>
-                                </div>
+                            </div>
                         </div>
                     </section>
-                    <footer class="modal-card-foot">
-                            <button class="button is-success" id="save-options-btn">Save & Generate</button>
-                            <button class="button" id="cancel-options-btn">Cancel</button>
+                    <footer class="modal-card-foot flex items-center gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4">
+                        <button class="button rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-200" id="save-options-btn" type="button">Save & Generate</button>
+                        <button class="button rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50" id="cancel-options-btn" type="button">Cancel</button>
                     </footer>
                 </div>
             </div>
+        </div>
         <script src="/src/js/app.js" type="module"></script>
         <footer>
         </footer>
