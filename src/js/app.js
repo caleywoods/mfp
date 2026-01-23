@@ -3,6 +3,7 @@ import BinaryTree from '../../algorithms/maze-generation/BinaryTree.js';
 import Sidewinder from '../../algorithms/maze-generation/Sidewinder.js';
 import Wilson from '../../algorithms/maze-generation/Wilson.js';
 import Dijkstra from '../../algorithms/maze-traversal/Dijkstra.js';
+import AStar from '../../algorithms/maze-traversal/AStar.js';
 
 // Cell size in pixels
 const gridConfig = {
@@ -14,6 +15,7 @@ const gridConfig = {
 };
 
 const solverConfig = {
+    algorithm: 'Dijkstra',
     drawSpeed: 100,
     showWeightedScores: false,
     slowMo: true
@@ -47,7 +49,29 @@ resizeMazeCanvas(gridConfig);
 maze.create()
 
 document.querySelector('#solve-btn').addEventListener('click', () => {
-    new Dijkstra(maze, solverConfig);
+    // Redraw the maze to clear any previous solution
+    const maze_canvas = document.querySelector('#maze');
+    const context = maze_canvas.getContext('2d');
+    context.clearRect(0, 0, maze_canvas.width, maze_canvas.height);
+    maze.draw();
+
+    // Hide comparison table, will show single solver stats
+    const comparisonTable = document.querySelector('#comparison-table');
+    comparisonTable.classList.add('max-h-0', 'opacity-0');
+    comparisonTable.classList.remove('max-h-96', 'opacity-100');
+
+    // Get algorithm from quick dropdown
+    const algorithm = document.querySelector('#quick-solve-algo').value;
+
+    switch (algorithm) {
+        case 'A*':
+            new AStar(maze, solverConfig);
+            break;
+        case 'Dijkstra':
+        default:
+            new Dijkstra(maze, solverConfig);
+            break;
+    }
 });
 
 const generateMaze = (algo) => {
@@ -79,6 +103,95 @@ const generateMaze = (algo) => {
 document.querySelector('#generate-btn').addEventListener('click', () => {
     const generatorAlgo = document.querySelector('#maze-gen-algo').selectedOptions[0].value;
     generateMaze(generatorAlgo);
+});
+
+document.querySelector('#compare-btn').addEventListener('click', () => {
+    // Hide single solver stats, show comparison table
+    const statsEl = document.querySelector('#solver-stats');
+    statsEl.classList.add('max-h-0', 'opacity-0');
+    statsEl.classList.remove('max-h-12', 'opacity-100');
+
+    const comparisonTable = document.querySelector('#comparison-table');
+    const comparisonBody = document.querySelector('#comparison-body');
+
+    // Clear previous results
+    comparisonBody.innerHTML = '';
+
+    // Config for comparison (no animation, no drawing)
+    const compareConfig = {
+        ...solverConfig,
+        slowMo: false,
+        skipDraw: true
+    };
+
+    const algorithms = [
+        { name: 'Dijkstra', solver: Dijkstra },
+        { name: 'A*', solver: AStar }
+    ];
+
+    const results = [];
+    let winningSolver = null;
+    let bestCellsVisited = Infinity;
+
+    for (const algo of algorithms) {
+        // Clear and redraw maze for fair comparison
+        const maze_canvas = document.querySelector('#maze');
+        const context = maze_canvas.getContext('2d');
+        context.clearRect(0, 0, maze_canvas.width, maze_canvas.height);
+        maze.draw();
+
+        const solver = new algo.solver(maze, compareConfig);
+        results.push({
+            name: algo.name,
+            ...solver.metrics
+        });
+
+        // Track the winner (fewest cells visited)
+        if (solver.metrics.cellsVisited < bestCellsVisited) {
+            bestCellsVisited = solver.metrics.cellsVisited;
+            winningSolver = algo.solver;
+        }
+    }
+
+    // Find best values for highlighting
+    const bestVisited = Math.min(...results.map(r => r.cellsVisited));
+    const bestPath = Math.min(...results.map(r => r.pathLength));
+    const bestEfficiency = Math.max(...results.map(r => r.pathLength / r.cellsVisited));
+    const bestTime = Math.min(...results.map(r => r.timeMs));
+
+    // Sort results by cells visited (winner on top)
+    results.sort((a, b) => a.cellsVisited - b.cellsVisited);
+
+    // Render results
+    for (const result of results) {
+        const efficiency = (result.pathLength / result.cellsVisited * 100).toFixed(1);
+        const isEfficiencyBest = (result.pathLength / result.cellsVisited) === bestEfficiency;
+
+        const row = document.createElement('tr');
+        row.className = 'border-t border-slate-200';
+        row.innerHTML = `
+            <td class="px-4 py-2 font-medium">${result.name}</td>
+            <td class="px-4 py-2 ${result.cellsVisited === bestVisited ? 'text-emerald-600 font-semibold' : ''}">${result.cellsVisited}</td>
+            <td class="px-4 py-2 ${result.pathLength === bestPath ? 'text-emerald-600 font-semibold' : ''}">${result.pathLength}</td>
+            <td class="px-4 py-2 ${isEfficiencyBest ? 'text-emerald-600 font-semibold' : ''}">${efficiency}%</td>
+            <td class="px-4 py-2 ${result.timeMs === bestTime ? 'text-emerald-600 font-semibold' : ''}">${result.timeMs.toFixed(2)}</td>
+        `;
+        comparisonBody.appendChild(row);
+    }
+
+    // Reveal comparison table
+    comparisonTable.classList.remove('max-h-0', 'opacity-0');
+    comparisonTable.classList.add('max-h-96', 'opacity-100');
+
+    // Draw the solution path from the winning algorithm (but don't show single solver stats)
+    if (winningSolver) {
+        const drawConfig = {
+            ...solverConfig,
+            skipDraw: false,
+            skipMetricsDisplay: true
+        };
+        new winningSolver(maze, drawConfig);
+    }
 });
 
 document.querySelector('#options-btn').addEventListener('click', () => {

@@ -13,6 +13,8 @@ export default class Dijkstra extends Walker {
     }
 
     solve() {
+        const startTime = performance.now();
+
         /**
          * Start and End are 2 element arrays with the shape:
          *     [0] - Cell ID
@@ -21,23 +23,32 @@ export default class Dijkstra extends Walker {
          *     that we can get the row and column number to start at and the row
          *     and column of our finishing cell.
          */
-        console.log('Grid: ', this.grid);
         const [start, end] = Array.from(this.grid.entrances.entries());
         const {cell: startCell} = start[1];
         const {cell: endCell} = end[1];
 
-        this.assignDistance(startCell, 0, true);
+        this.assignDistance(startCell, 0);
         const endScore = this.visited.get(endCell.id);
 
         // Collect path from end to start, then reverse to get start -> end order
         const path = this.collectPath(endCell, endScore - 1);
         path.reverse();
-        this.drawPath(path);
+
+        // Record metrics
+        this.metrics.cellsVisited = this.visited.size;
+        this.metrics.pathLength = path.length;
+        this.metrics.timeMs = performance.now() - startTime;
+        if (!this.skipDraw) {
+            if (!this.skipMetricsDisplay) {
+                this.displayMetrics();
+            }
+            this.drawPath(path);
+        }
     }
 
-    assignDistance(cell, startDistance) {
+    assignDistance(cell, distance) {
         if (!this.visited.has(cell.id)) {
-            this.visited.set(cell.id, startDistance);
+            this.visited.set(cell.id, distance);
 
             if (this.showWeightedScores) {
                 const x = (this.grid.squareWidth * cell.col) + this.grid.squareWidth;
@@ -46,18 +57,18 @@ export default class Dijkstra extends Walker {
                 this.context.fillStyle = '#222529';
                 this.context.globalAlpha = 1;
 
-                if (startDistance > 99) {
-                    this.context.fillText(startDistance, x + this.grid.squareWidth * .005, y + this.grid.squareHeight * .65);
-                } else if (startDistance > 9) {
-                    this.context.fillText(startDistance, x + this.grid.squareWidth * .1, y + this.grid.squareHeight * .65);
+                if (distance > 99) {
+                    this.context.fillText(distance, x + this.grid.squareWidth * .005, y + this.grid.squareHeight * .65);
+                } else if (distance > 9) {
+                    this.context.fillText(distance, x + this.grid.squareWidth * .1, y + this.grid.squareHeight * .65);
                 } else {
                     this.context.font = '8px sans-serif';
-                    this.context.fillText(startDistance, x + this.grid.squareWidth * .4, y + this.grid.squareHeight * .65);
+                    this.context.fillText(distance, x + this.grid.squareWidth * .4, y + this.grid.squareHeight * .65);
                 }
             }
 
             for (const link of cell.links.keys()) {
-                this.assignDistance(link, startDistance + 1, false);
+                this.assignDistance(link, distance + 1);
             }
         }
 
@@ -82,18 +93,36 @@ export default class Dijkstra extends Walker {
     }
 
     drawPath(path) {
+        const entrances = Array.from(this.grid.entrances.values());
+        const startDirection = entrances.find(e => e.cell.isStart)?.direction;
+        const endDirection = entrances.find(e => e.cell.isEnd)?.direction;
+
         for (let i = 0; i < path.length; i++) {
             const cell = path[i];
             const x = (this.grid.squareWidth * cell.col) + this.grid.squareWidth + 1;
             const y = (this.grid.squareHeight * cell.row) + this.grid.squareHeight + 1;
+            const isStart = i === 0;
+            const isEnd = i === path.length - 1;
 
             if (this.slowMo) {
                 setTimeout(() => {
                     this.context.fillRect(x, y, this.grid.squareWidth, this.grid.squareHeight);
+                    if (isStart && startDirection) {
+                        this.drawArrow(this.context, x, y, startDirection, this.grid.squareWidth, true);
+                    }
+                    if (isEnd && endDirection) {
+                        this.drawArrow(this.context, x, y, endDirection, this.grid.squareWidth, false);
+                    }
                 }, this.stagger);
                 this.stagger += this.drawSpeed;
             } else {
                 this.context.fillRect(x, y, this.grid.squareWidth, this.grid.squareHeight);
+                if (isStart && startDirection) {
+                    this.drawArrow(this.context, x, y, startDirection, this.grid.squareWidth, true);
+                }
+                if (isEnd && endDirection) {
+                    this.drawArrow(this.context, x, y, endDirection, this.grid.squareWidth, false);
+                }
             }
         }
     }

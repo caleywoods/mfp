@@ -126,7 +126,10 @@ export default class Grid {
 
     // Actually draw our grid to the screen using Canvas API
     draw() {
-        this.chooseEntrances();
+        // Only choose entrances once per maze
+        if (this.entrances.size === 0) {
+            this.chooseEntrances();
+        }
         const maze_canvas = document.querySelector('#maze');
         const context = maze_canvas.getContext('2d');
 
