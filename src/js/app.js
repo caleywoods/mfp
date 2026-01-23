@@ -19,7 +19,31 @@ const solverConfig = {
     slowMo: true
 };
 
+const resizeMazeCanvas = (config) => {
+    const maze_canvas = document.querySelector('#maze');
+
+    const cellW = Number(config.squareWidth) || 20;
+    const cellH = Number(config.squareHeight) || 20;
+    const cols = Number(config.cols) || 10;
+    const rows = Number(config.rows) || 10;
+
+    const paddingX = cellW;
+    const paddingY = cellH;
+
+    const nextWidth = (cols * cellW) + paddingX;
+    const nextHeight = (rows * cellH) + paddingY;
+
+    if (maze_canvas.width !== nextWidth) {
+        maze_canvas.width = nextWidth;
+    }
+
+    if (maze_canvas.height !== nextHeight) {
+        maze_canvas.height = nextHeight;
+    }
+};
+
 let maze = new Wilson(gridConfig.rows, gridConfig.cols, gridConfig);
+resizeMazeCanvas(gridConfig);
 maze.create()
 
 document.querySelector('#solve-btn').addEventListener('click', () => {
@@ -28,8 +52,8 @@ document.querySelector('#solve-btn').addEventListener('click', () => {
 
 const generateMaze = (algo) => {
     const maze_canvas = document.querySelector('#maze');
+    resizeMazeCanvas(gridConfig);
     const context = maze_canvas.getContext('2d');
-
     context.clearRect(0, 0, maze_canvas.width, maze_canvas.height);
 
     switch(algo) {
@@ -59,15 +83,15 @@ document.querySelector('#generate-btn').addEventListener('click', () => {
 
 document.querySelector('#options-btn').addEventListener('click', () => {
     const modal = document.querySelector('.modal');
-    modal.classList.add('is-active');
+    modal.classList.remove('hidden');
 });
 
-const modalClosers = Array.from(document.querySelectorAll('.modal-card-head button, #cancel-options-btn'));
+const modalClosers = Array.from(document.querySelectorAll('.modal-card-head button, .modal-background, #cancel-options-btn'));
 
 modalClosers.forEach(element => {
     element.addEventListener('click', () => {
         const modal = document.querySelector('.modal');
-        modal.classList.remove('is-active');
+        modal.classList.add('hidden');
     });
 });
 
@@ -119,7 +143,7 @@ document.querySelector('#save-options-btn').addEventListener('click', () => {
     generateMaze(generatorAlgo);
 
     const modal = document.querySelector('.modal');
-    modal.classList.remove('is-active');
+    modal.classList.add('hidden');
 });
 
 const quickCellSizeButtons = Array.from(document.querySelectorAll('.cell-size-increase'));

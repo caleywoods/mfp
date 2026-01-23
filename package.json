@@ -1,6 +1,6 @@
 {
   "name": "mfp",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Mazes for programmers",
   "private": true,
   "scripts": {
@@ -28,9 +28,9 @@
   "dependencies": {},
   "devDependencies": {
     "autoprefixer": "^10.4.0",
-    "bulma": "^0.8.0",
     "postcss": "^8.4.0",
     "sass": "^1.70.0",
+    "tailwindcss": "^3.4.0",
     "vite": "^5.0.0"
   }
 }
