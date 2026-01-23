@@ -1,6 +1,6 @@
 {
   "name": "mfp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Mazes for programmers",
   "private": true,
   "scripts": {
