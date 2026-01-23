@@ -75,6 +75,15 @@ document.querySelector('#solve-btn').addEventListener('click', () => {
 });
 
 const generateMaze = (algo) => {
+    // Hide comparison table and solver stats when generating new maze
+    const comparisonTable = document.querySelector('#comparison-table');
+    comparisonTable.classList.add('max-h-0', 'opacity-0');
+    comparisonTable.classList.remove('max-h-96', 'opacity-100');
+
+    const statsEl = document.querySelector('#solver-stats');
+    statsEl.classList.add('max-h-0', 'opacity-0');
+    statsEl.classList.remove('max-h-12', 'opacity-100');
+
     const maze_canvas = document.querySelector('#maze');
     resizeMazeCanvas(gridConfig);
     const context = maze_canvas.getContext('2d');

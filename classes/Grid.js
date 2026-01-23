@@ -134,7 +134,7 @@ export default class Grid {
         const context = maze_canvas.getContext('2d');
 
         context.strokeStyle = '#222529';
-        context.moveTo(this.squareWidth, this.squareHeight);
+        context.lineWidth = 1;
         context.beginPath();
         let x = 0;
         let y = 0;
@@ -175,25 +175,30 @@ export default class Grid {
 
                 // North wall: draw if no neighbor or not linked (skip if entrance)
                 if (entranceDirection !== 'north' && (north === null || !cell.isLinked(north))) {
-                    context.lineTo(x + this.squareWidth, y);
+                    context.moveTo(x + 0.5, y + 0.5);
+                    context.lineTo(x + this.squareWidth + 0.5, y + 0.5);
                 }
 
                 // East wall: draw if no neighbor or not linked (skip if entrance)
                 if (entranceDirection !== 'east' && (east === null || !cell.isLinked(east))) {
-                    context.moveTo(x + this.squareWidth, y);
-                    context.lineTo(x + this.squareWidth, y + this.squareHeight);
+                    // Use -0.5px offset for east border to stay in bounds but remain crisp
+                    const isEastBorder = east === null;
+                    const offset = isEastBorder ? -0.5 : 0.5;
+                    context.moveTo(x + this.squareWidth + offset, y + 0.5);
+                    context.lineTo(x + this.squareWidth + offset, y + this.squareHeight + 0.5);
                 }
 
                 // South wall: only draw on boundary (no neighbor) - interior handled by next row's north
                 if (entranceDirection !== 'south' && south === null) {
-                    context.moveTo(x, y + this.squareHeight);
-                    context.lineTo(x + this.squareWidth, y + this.squareHeight);
+                    // Use -0.5px offset for south border to stay in bounds but remain crisp
+                    context.moveTo(x + 0.5, y + this.squareHeight - 0.5);
+                    context.lineTo(x + this.squareWidth + 0.5, y + this.squareHeight - 0.5);
                 }
 
                 // West wall: only draw on boundary (no neighbor) - interior handled by prev col's east
                 if (entranceDirection !== 'west' && west === null) {
-                    context.moveTo(x, y);
-                    context.lineTo(x, y + this.squareHeight);
+                    context.moveTo(x + 0.5, y + 0.5);
+                    context.lineTo(x + 0.5, y + this.squareHeight + 0.5);
                 }
 
                 x += this.squareWidth;
