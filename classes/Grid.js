@@ -162,51 +162,32 @@ export default class Grid {
                     }
                 }
 
-                for (const entry of Object.entries(cell.neighbors)) {
-                    const [direction, neighborCell] = entry;
+                const north = cell.neighbors.north;
+                const east = cell.neighbors.east;
+                const south = cell.neighbors.south;
+                const west = cell.neighbors.west;
 
-                    // Skip drawing walls for our cells that serve as entrances
-                    if (entrance) {
-                        if (entranceDirection === direction) {
-                            continue;
-                        }
-                    }
+                // North wall: draw if no neighbor or not linked (skip if entrance)
+                if (entranceDirection !== 'north' && (north === null || !cell.isLinked(north))) {
+                    context.lineTo(x + this.squareWidth, y);
+                }
 
-                    // If there's no neighbor in this direction, we can draw a wall
-                    if (neighborCell === null) {
-                        switch (direction) {
-                            case 'north':
-                                context.lineTo(x + this.squareWidth, y);
-                                break;
-                            case 'east':
-                                context.moveTo(x + this.squareWidth, y);
-                                context.lineTo(x + (this.squareWidth), y + this.squareHeight);
-                                break;
-                            case 'south':
-                                context.moveTo(x, y + this.squareHeight);
-                                context.lineTo(x + this.squareWidth, y + this.squareHeight);
-                                break;
-                            case 'west':
-                                context.moveTo(x, y);
-                                context.lineTo(x, y + this.squareHeight);
-                                break;
-                        }
-                    } else {
-                        // If the neighbor is not linked, stroke
-                        const drawWall = !cell.isLinked(neighborCell);
+                // East wall: draw if no neighbor or not linked (skip if entrance)
+                if (entranceDirection !== 'east' && (east === null || !cell.isLinked(east))) {
+                    context.moveTo(x + this.squareWidth, y);
+                    context.lineTo(x + this.squareWidth, y + this.squareHeight);
+                }
 
-                        if (drawWall) {
-                            switch (direction) {
-                                case 'north':
-                                    context.lineTo(x + this.squareWidth, y);
-                                    break;
-                                case 'east':
-                                    context.moveTo(x + this.squareWidth, y);
-                                    context.lineTo(x + this.squareWidth, y + this.squareHeight);
-                                    break;
-                            }
-                        }
-                    }
+                // South wall: only draw on boundary (no neighbor) - interior handled by next row's north
+                if (entranceDirection !== 'south' && south === null) {
+                    context.moveTo(x, y + this.squareHeight);
+                    context.lineTo(x + this.squareWidth, y + this.squareHeight);
+                }
+
+                // West wall: only draw on boundary (no neighbor) - interior handled by prev col's east
+                if (entranceDirection !== 'west' && west === null) {
+                    context.moveTo(x, y);
+                    context.lineTo(x, y + this.squareHeight);
                 }
 
                 x += this.squareWidth;
