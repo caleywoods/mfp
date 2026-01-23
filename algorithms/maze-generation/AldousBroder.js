@@ -12,8 +12,7 @@ export default class AldousBroder extends Grid {
         let cell = this.cells[row][col];
         let unvisited = this.rows * this.cols - 1;
         while (unvisited > 0) {
-            // Filter call here cuts out the null neighbors so we only have valid cells
-            const cellNeighbors = Array.from(Object.values(cell.neighbors)).filter(neighbor => neighbor);
+            const cellNeighbors = cell.validNeighbors;
 
             const idx = Math.floor(Math.random() * cellNeighbors.length);
             const neighbor = cellNeighbors[idx];

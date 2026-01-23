@@ -21,7 +21,7 @@ export default class Wilson extends Grid {
             let walk = [cell];
 
             while (unvisited.has(cell.id)) {
-                const cellNeighbors = Array.from(Object.values(cell.neighbors)).filter(neighbor => neighbor);
+                const cellNeighbors = cell.validNeighbors;
                 const idx = Math.floor(Math.random() * cellNeighbors.length);
                 cell = cellNeighbors[idx];
                 const pos = walk.indexOf(cell);
