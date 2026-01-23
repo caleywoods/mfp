@@ -50,23 +50,24 @@ export default class Walker {
     drawArrow(ctx, x, y, direction, size, isEntrance = false) {
         const halfSize = size / 2;
         const arrowSize = size * 0.4;
-        let centerX = x + halfSize;
-        let centerY = y + halfSize;
+        // Add 0.5px offset for crisp rendering on pixel boundaries
+        let centerX = Math.floor(x + halfSize) + 0.5;
+        let centerY = Math.floor(y + halfSize) + 0.5;
 
         // For entrance arrows, position outside the cell and point inward
         if (isEntrance) {
             switch (direction) {
                 case 'north':
-                    centerY = y - halfSize; // Above the cell
+                    centerY = Math.floor(y - halfSize) + 0.5; // Above the cell
                     break;
                 case 'south':
-                    centerY = y + size + halfSize; // Below the cell
+                    centerY = Math.floor(y + size + halfSize) + 0.5; // Below the cell
                     break;
                 case 'east':
-                    centerX = x + size + halfSize; // Right of the cell
+                    centerX = Math.floor(x + size + halfSize) + 0.5; // Right of the cell
                     break;
                 case 'west':
-                    centerX = x - halfSize; // Left of the cell
+                    centerX = Math.floor(x - halfSize) + 0.5; // Left of the cell
                     break;
             }
         }
