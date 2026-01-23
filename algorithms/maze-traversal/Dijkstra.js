@@ -1,6 +1,5 @@
 import Walker from '../../classes/Walker.js';
 
-// Test comment for testing mirroring with priv GL repo
 export default class Dijkstra extends Walker {
     constructor(_grid, _config) {
         super(_grid, _config);
@@ -30,7 +29,10 @@ export default class Dijkstra extends Walker {
         this.assignDistance(startCell, 0, true);
         const endScore = this.visited.get(endCell.id);
 
-        this.fillShortestPath(endCell, endScore - 1);
+        // Collect path from end to start, then reverse to get start -> end order
+        const path = this.collectPath(endCell, endScore - 1);
+        path.reverse();
+        this.drawPath(path);
     }
 
     assignDistance(cell, startDistance) {
@@ -65,27 +67,33 @@ export default class Dijkstra extends Walker {
         }
     }
 
-    fillShortestPath(cell, targetScore) {
-        if (cell.isEnd) {
-            const x = (this.grid.squareWidth * cell.col) + this.grid.squareWidth;
-            const y = (this.grid.squareHeight * cell.row) + this.grid.squareHeight;
-            this.context.fillRect(x + 1, y + 1, this.grid.squareWidth, this.grid.squareHeight);
-        }
-        for (let link of cell.links) {
-            [link] = link
+    collectPath(cell, targetScore, path = []) {
+        path.push(cell);
+
+        for (const [link] of cell.links) {
             const cellScore = this.visited.get(link.id);
-            const x = (this.grid.squareWidth * link.col + 1) + this.grid.squareWidth;
-            const y = (this.grid.squareHeight * link.row + 1) + this.grid.squareHeight;
             if (cellScore === targetScore) {
-                if (this.slowMo) {
-                    setTimeout(() => {
-                        this.context.fillRect(x, y, this.grid.squareWidth, this.grid.squareHeight);
-                    }, this.stagger);
-                    this.stagger += this.drawSpeed;
-                } else {
+                this.collectPath(link, targetScore - 1, path);
+                break;
+            }
+        }
+
+        return path;
+    }
+
+    drawPath(path) {
+        for (let i = 0; i < path.length; i++) {
+            const cell = path[i];
+            const x = (this.grid.squareWidth * cell.col) + this.grid.squareWidth + 1;
+            const y = (this.grid.squareHeight * cell.row) + this.grid.squareHeight + 1;
+
+            if (this.slowMo) {
+                setTimeout(() => {
                     this.context.fillRect(x, y, this.grid.squareWidth, this.grid.squareHeight);
-                }
-                this.fillShortestPath(link, targetScore - 1);
+                }, this.stagger);
+                this.stagger += this.drawSpeed;
+            } else {
+                this.context.fillRect(x, y, this.grid.squareWidth, this.grid.squareHeight);
             }
         }
     }
