@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
 // DOM Elements
 const canvas = document.getElementById('maze-container');
@@ -59,8 +60,10 @@ function createSkybox() {
 const skybox = createSkybox();
 scene.add(skybox);
 
-// Fog that matches sky gradient
-scene.fog = new THREE.Fog(0x1a1a2e, 15, 80);
+// Fog that matches sky gradient (will be adjusted for large mazes)
+let fogNear = 15;
+let fogFar = 80;
+scene.fog = new THREE.Fog(0x1a1a2e, fogNear, fogFar);
 
 // Camera
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -209,6 +212,9 @@ const minimapCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
 let solutionPath = [];
 let solutionVisible = false;
 let solutionMeshes = [];
+let hintArrow = null;
+let hintVisible = false;
+let hintTimeout = null;
 
 // Build maze from loaded data or create test environment
 function buildMaze() {
@@ -300,6 +306,11 @@ function buildMaze() {
     const entranceMap = new Map();
     entrances.forEach(e => entranceMap.set(e.cellId, e.direction));
 
+    // Collect wall geometries for merging (performance optimization)
+    const wallGeometries = [];
+    const horizontalWallGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, WALL_THICKNESS);
+    const verticalWallGeo = new THREE.BoxGeometry(WALL_THICKNESS, WALL_HEIGHT, CELL_SIZE);
+
     // Build walls for each cell
     cells.forEach(cell => {
         const { row, col, links, isStart, isEnd } = cell;
@@ -315,24 +326,24 @@ function buildMaze() {
         const northId = row > 0 ? (row - 1) * cols + col : null;
         const hasNorthLink = northId !== null && links.includes(northId);
         if (!hasNorthLink && entranceDir !== 'north') {
-            addWall(cellX, cellZ - CELL_SIZE / 2, 'horizontal');
+            addWallGeometry(cellX, cellZ - CELL_SIZE / 2, 'horizontal');
         }
 
         // South wall (row + 1) - only on boundary
         if (row === rows - 1 && entranceDir !== 'south') {
-            addWall(cellX, cellZ + CELL_SIZE / 2, 'horizontal');
+            addWallGeometry(cellX, cellZ + CELL_SIZE / 2, 'horizontal');
         }
 
         // West wall (col - 1)
         const westId = col > 0 ? row * cols + (col - 1) : null;
         const hasWestLink = westId !== null && links.includes(westId);
         if (!hasWestLink && entranceDir !== 'west') {
-            addWall(cellX - CELL_SIZE / 2, cellZ, 'vertical');
+            addWallGeometry(cellX - CELL_SIZE / 2, cellZ, 'vertical');
         }
 
         // East wall (col + 1) - only on boundary
         if (col === cols - 1 && entranceDir !== 'east') {
-            addWall(cellX + CELL_SIZE / 2, cellZ, 'vertical');
+            addWallGeometry(cellX + CELL_SIZE / 2, cellZ, 'vertical');
         }
 
         // Add start/end markers
@@ -351,6 +362,18 @@ function buildMaze() {
             const fovRad = (75 / 2) * (Math.PI / 180);
             dropHeight = Math.max(25, (maxDimension / 2) / Math.tan(fovRad) * 1.2);
             
+            // Adjust fog and camera far plane for large mazes
+            const requiredViewDistance = dropHeight * 1.5;
+            if (requiredViewDistance > fogFar) {
+                fogFar = requiredViewDistance + 50;
+                fogNear = Math.max(15, dropHeight * 0.3);
+                scene.fog.near = fogNear;
+                scene.fog.far = fogFar;
+                camera.far = Math.max(1000, fogFar + 100);
+                camera.updateProjectionMatrix();
+                console.log('Adjusted fog for large maze:', fogNear, '-', fogFar);
+            }
+            
             // Center camera over maze center for drop-in view
             const mazeCenterX = mazeWidth / 2;
             const mazeCenterZ = mazeDepth / 2;
@@ -359,57 +382,30 @@ function buildMaze() {
             camera.position.copy(dropStartPosition);
             camera.lookAt(mazeCenterX, 0, mazeCenterZ);
             
-            // Determine which direction has an open corridor
-            // Check links to find an open passage
-            const startCell = cell;
-            if (links.includes(cell.id - 1) && col > 0) {
-                // West is open
-                spawnYaw = Math.PI / 2;
-            } else if (links.includes(cell.id + 1) && col < cols - 1) {
-                // East is open
-                spawnYaw = -Math.PI / 2;
-            } else if (links.includes(cell.id - cols) && row > 0) {
-                // North is open
-                spawnYaw = Math.PI;
-            } else if (links.includes(cell.id + cols) && row < rows - 1) {
-                // South is open
-                spawnYaw = 0;
-            } else if (entranceDir === 'north') {
-                // Entrance is north, face south (into maze)
-                spawnYaw = 0;
-            } else if (entranceDir === 'south') {
-                // Entrance is south, face north
-                spawnYaw = Math.PI;
-            } else if (entranceDir === 'west') {
-                // Entrance is west, face east
-                spawnYaw = -Math.PI / 2;
-            } else if (entranceDir === 'east') {
-                // Entrance is east, face west
-                spawnYaw = Math.PI / 2;
-            }
+            // Spawn yaw will be set after solution path is loaded
+            // to face along the solution path direction
         }
         if (isEnd) {
             addMarker(cellX, cellZ, 0xFB5D55);
         }
     });
 
-    function addWall(x, z, orientation) {
+    // Helper to add wall geometry (for merging) and collision box
+    function addWallGeometry(x, z, orientation) {
         let geometry;
         let halfWidth, halfDepth;
         if (orientation === 'horizontal') {
-            geometry = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, WALL_THICKNESS);
+            geometry = horizontalWallGeo.clone();
             halfWidth = CELL_SIZE / 2;
             halfDepth = WALL_THICKNESS / 2;
         } else {
-            geometry = new THREE.BoxGeometry(WALL_THICKNESS, WALL_HEIGHT, CELL_SIZE);
+            geometry = verticalWallGeo.clone();
             halfWidth = WALL_THICKNESS / 2;
             halfDepth = CELL_SIZE / 2;
         }
-        const wall = new THREE.Mesh(geometry, wallMaterial);
-        wall.position.set(x, WALL_HEIGHT / 2, z);
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        scene.add(wall);
+        // Translate geometry to position (instead of mesh position)
+        geometry.translate(x, WALL_HEIGHT / 2, z);
+        wallGeometries.push(geometry);
 
         // Store bounding box for collision detection
         wallBoundingBoxes.push({
@@ -418,6 +414,16 @@ function buildMaze() {
             minZ: z - halfDepth,
             maxZ: z + halfDepth
         });
+    }
+
+    // Merge all wall geometries into a single mesh (huge performance boost)
+    if (wallGeometries.length > 0) {
+        const mergedGeometry = BufferGeometryUtils.mergeGeometries(wallGeometries);
+        const wallsMesh = new THREE.Mesh(mergedGeometry, wallMaterial);
+        wallsMesh.castShadow = true;
+        wallsMesh.receiveShadow = true;
+        scene.add(wallsMesh);
+        console.log('Merged', wallGeometries.length, 'walls into single mesh');
     }
 
     function addMarker(x, z, color) {
@@ -429,6 +435,33 @@ function buildMaze() {
     }
 
     console.log('Maze built:', rows, 'x', cols, 'cells');
+    
+    // Load precomputed solution path from mazeData (computed before navigation)
+    if (mazeData.solutionPath && mazeData.solutionPath.length > 0) {
+        // Convert cell IDs back to cell objects
+        const cellMap = new Map();
+        cells.forEach(c => cellMap.set(c.id, c));
+        solutionPath = mazeData.solutionPath.map(id => cellMap.get(id)).filter(c => c);
+        console.log('Solution path loaded:', solutionPath.length, 'cells');
+    } else {
+        // Fallback: compute if not precomputed (e.g., after regeneration)
+        solutionPath = solveMaze();
+        console.log('Solution path computed:', solutionPath.length, 'cells');
+    }
+    
+    // Set spawn yaw to face along the solution path (into the maze)
+    if (solutionPath.length >= 2) {
+        const startCell = solutionPath[0];
+        const nextCell = solutionPath[1];
+        const startX = startCell.col * CELL_SIZE + CELL_SIZE / 2;
+        const startZ = startCell.row * CELL_SIZE + CELL_SIZE / 2;
+        const nextX = nextCell.col * CELL_SIZE + CELL_SIZE / 2;
+        const nextZ = nextCell.row * CELL_SIZE + CELL_SIZE / 2;
+        // atan2(x, z) gives angle from +Z axis, but camera looks down -Z
+        // So we need to add PI to face the direction we want to go
+        spawnYaw = Math.atan2(nextX - startX, nextZ - startZ) + Math.PI;
+        console.log('Spawn yaw set to face solution path:', spawnYaw);
+    }
 }
 
 // Fallback test environment
@@ -738,6 +771,10 @@ document.addEventListener('keydown', (event) => {
     if (event.code === 'KeyP') {
         toggleSolutionPath();
     }
+    // Show hint with H key
+    if (event.code === 'KeyH') {
+        showHint();
+    }
     // Regenerate maze with R key
     if (event.code === 'KeyR') {
         regenerateMaze();
@@ -816,59 +853,69 @@ function solveMaze() {
     return path;
 }
 
-// Create 3D path visualization
+// Create 3D path visualization - floating line with arrows
 function createSolutionMeshes(path) {
     // Clear existing meshes
     solutionMeshes.forEach(mesh => scene.remove(mesh));
     solutionMeshes = [];
     
-    if (path.length === 0) return;
+    if (path.length < 2) return;
     
-    const pathMaterial = new THREE.MeshStandardMaterial({
+    // Create a glowing line path using tubes
+    const points = path.map(cell => new THREE.Vector3(
+        cell.col * CELL_SIZE + CELL_SIZE / 2,
+        0.5, // Float slightly above ground
+        cell.row * CELL_SIZE + CELL_SIZE / 2
+    ));
+    
+    const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.2);
+    const tubeGeometry = new THREE.TubeGeometry(curve, path.length * 4, 0.08, 8, false);
+    const tubeMaterial = new THREE.MeshStandardMaterial({
         color: 0x61D095,
         transparent: true,
-        opacity: 0.6,
+        opacity: 0.7,
         emissive: 0x61D095,
-        emissiveIntensity: 0.3
+        emissiveIntensity: 0.5
+    });
+    const tube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+    scene.add(tube);
+    solutionMeshes.push(tube);
+    
+    // Add direction arrows along the path - bright white for visibility
+    const arrowMaterial = new THREE.MeshStandardMaterial({
+        color: 0xFFFFFF,
+        emissive: 0xFFFFFF,
+        emissiveIntensity: 0.8
     });
     
-    // Create path segments
-    for (let i = 0; i < path.length; i++) {
+    // Place arrows every 2-3 cells, starting from cell 1
+    const arrowInterval = Math.max(2, Math.min(3, Math.floor(path.length / 8)));
+    for (let i = 1; i < path.length - 1; i += arrowInterval) {
         const cell = path[i];
+        const nextCell = path[i + 1];
+        
         const x = cell.col * CELL_SIZE + CELL_SIZE / 2;
         const z = cell.row * CELL_SIZE + CELL_SIZE / 2;
+        const nextX = nextCell.col * CELL_SIZE + CELL_SIZE / 2;
+        const nextZ = nextCell.row * CELL_SIZE + CELL_SIZE / 2;
         
-        // Create a flat box for each cell in path
-        const geometry = new THREE.BoxGeometry(CELL_SIZE * 0.6, 0.05, CELL_SIZE * 0.6);
-        const mesh = new THREE.Mesh(geometry, pathMaterial);
-        mesh.position.set(x, 0.03, z);
-        mesh.receiveShadow = true;
-        scene.add(mesh);
-        solutionMeshes.push(mesh);
+        // Arrow cone pointing in direction of travel
+        const arrowGeo = new THREE.ConeGeometry(0.25, 0.6, 8);
+        const arrow = new THREE.Mesh(arrowGeo, arrowMaterial);
+        arrow.position.set(x, 0.5, z);
         
-        // Add connecting segments between cells
-        if (i < path.length - 1) {
-            const nextCell = path[i + 1];
-            const nextX = nextCell.col * CELL_SIZE + CELL_SIZE / 2;
-            const nextZ = nextCell.row * CELL_SIZE + CELL_SIZE / 2;
-            
-            const midX = (x + nextX) / 2;
-            const midZ = (z + nextZ) / 2;
-            const dx = nextX - x;
-            const dz = nextZ - z;
-            const length = Math.sqrt(dx * dx + dz * dz);
-            
-            const connectorGeo = new THREE.BoxGeometry(
-                dx !== 0 ? length * 0.3 : CELL_SIZE * 0.3,
-                0.05,
-                dz !== 0 ? length * 0.3 : CELL_SIZE * 0.3
-            );
-            const connector = new THREE.Mesh(connectorGeo, pathMaterial);
-            connector.position.set(midX, 0.03, midZ);
-            scene.add(connector);
-            solutionMeshes.push(connector);
-        }
+        // Rotate cone to lay flat and point toward next cell
+        // Cone points up (+Y) by default, rotate to point along travel direction
+        const angle = Math.atan2(nextX - x, nextZ - z);
+        arrow.rotation.order = 'YXZ';
+        arrow.rotation.y = angle;
+        arrow.rotation.x = Math.PI / 2;
+        
+        scene.add(arrow);
+        solutionMeshes.push(arrow);
     }
+    
+    console.log('Added', Math.floor((path.length - 2) / arrowInterval), 'direction arrows');
     
     console.log('Solution path created:', path.length, 'cells');
 }
@@ -878,8 +925,8 @@ function toggleSolutionPath() {
     solutionVisible = !solutionVisible;
     
     if (solutionVisible) {
-        if (solutionPath.length === 0) {
-            solutionPath = solveMaze();
+        // Create meshes if not already created
+        if (solutionMeshes.length === 0 && solutionPath.length > 0) {
             createSolutionMeshes(solutionPath);
         } else {
             // Show existing meshes
@@ -891,6 +938,108 @@ function toggleSolutionPath() {
     }
     
     console.log('Solution path:', solutionVisible ? 'visible' : 'hidden');
+}
+
+// Show a hint - glowing floor arrow and short path segment
+function showHint() {
+    if (solutionPath.length === 0) return;
+    
+    // Find which cell the player is closest to on the solution path
+    const playerX = camera.position.x;
+    const playerZ = camera.position.z;
+    const playerCol = Math.floor(playerX / CELL_SIZE);
+    const playerRow = Math.floor(playerZ / CELL_SIZE);
+    
+    // Find player's closest position in solution path
+    let pathIndex = -1;
+    let minDist = Infinity;
+    for (let i = 0; i < solutionPath.length; i++) {
+        const cell = solutionPath[i];
+        const dist = Math.abs(cell.row - playerRow) + Math.abs(cell.col - playerCol);
+        if (dist < minDist) {
+            minDist = dist;
+            pathIndex = i;
+        }
+    }
+    
+    // Remove existing hint elements
+    if (hintArrow) {
+        if (Array.isArray(hintArrow)) {
+            hintArrow.forEach(obj => scene.remove(obj));
+        } else {
+            scene.remove(hintArrow);
+        }
+    }
+    if (hintTimeout) {
+        clearTimeout(hintTimeout);
+    }
+    
+    const hintElements = [];
+    const hintTileMaterial = new THREE.MeshStandardMaterial({
+        color: 0xFFD700, // Gold for tiles
+        emissive: 0xFFD700,
+        emissiveIntensity: 1.0,
+        transparent: true,
+        opacity: 0.9
+    });
+    const hintArrowMaterial = new THREE.MeshStandardMaterial({
+        color: 0xFF6B35, // Coral/orange for arrows - complements gold
+        emissive: 0xFF6B35,
+        emissiveIntensity: 1.0
+    });
+    
+    // Show next 3-5 cells of the path as glowing floor tiles
+    const showCells = Math.min(5, solutionPath.length - pathIndex);
+    for (let i = 0; i < showCells; i++) {
+        const idx = pathIndex + i;
+        if (idx >= solutionPath.length) break;
+        
+        const cell = solutionPath[idx];
+        const x = cell.col * CELL_SIZE + CELL_SIZE / 2;
+        const z = cell.row * CELL_SIZE + CELL_SIZE / 2;
+        
+        // Glowing floor tile
+        const tileGeo = new THREE.BoxGeometry(CELL_SIZE * 0.7, 0.08, CELL_SIZE * 0.7);
+        const tile = new THREE.Mesh(tileGeo, hintTileMaterial);
+        tile.position.set(x, 0.05, z);
+        scene.add(tile);
+        hintElements.push(tile);
+        
+        // Add arrow on floor pointing to next cell
+        if (idx < solutionPath.length - 1) {
+            const nextCell = solutionPath[idx + 1];
+            const nextX = nextCell.col * CELL_SIZE + CELL_SIZE / 2;
+            const nextZ = nextCell.row * CELL_SIZE + CELL_SIZE / 2;
+            
+            const arrowGeo = new THREE.ConeGeometry(0.3, 0.7, 8);
+            const arrow = new THREE.Mesh(arrowGeo, hintArrowMaterial);
+            arrow.position.set(x, 0.2, z);
+            
+            // Point toward next cell (rotate cone to lay flat and point direction)
+            // Cone points up (+Y) by default, rotate to point along travel direction
+            const angle = Math.atan2(nextX - x, nextZ - z);
+            arrow.rotation.order = 'YXZ';
+            arrow.rotation.y = angle;
+            arrow.rotation.x = Math.PI / 2;
+            
+            scene.add(arrow);
+            hintElements.push(arrow);
+        }
+    }
+    
+    hintArrow = hintElements;
+    hintVisible = true;
+    
+    // Remove after 4 seconds
+    hintTimeout = setTimeout(() => {
+        if (hintArrow && Array.isArray(hintArrow)) {
+            hintArrow.forEach(obj => scene.remove(obj));
+            hintArrow = null;
+            hintVisible = false;
+        }
+    }, 4000);
+    
+    console.log('Hint: Showing', showCells, 'cells from path index', pathIndex);
 }
 
 // Regenerate maze in 3D view

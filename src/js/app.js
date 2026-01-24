@@ -352,8 +352,83 @@ document.querySelector('#enter-maze-btn').addEventListener('click', () => {
     
     // Serialize maze data to localStorage
     const mazeData = maze.toJSON();
+    
+    // Precompute solution path using Dijkstra before navigating
+    const solutionPath = computeSolutionPath(mazeData);
+    mazeData.solutionPath = solutionPath;
+    
     localStorage.setItem('mazeData', JSON.stringify(mazeData));
     
     // Navigate to 3D maze page
     window.location.href = '/maze3d.html';
 });
+
+// Compute solution path using Dijkstra's algorithm
+function computeSolutionPath(mazeData) {
+    const { rows, cols, cells } = mazeData;
+    
+    // Build cell lookup
+    const cellMap = new Map();
+    cells.forEach(c => cellMap.set(c.id, c));
+    
+    // Find start and end cells
+    let startCell = null;
+    let endCell = null;
+    cells.forEach(c => {
+        if (c.isStart) startCell = c;
+        if (c.isEnd) endCell = c;
+    });
+    
+    if (!startCell || !endCell) {
+        console.warn('No start or end cell found');
+        return [];
+    }
+    
+    // Dijkstra's algorithm
+    const distances = new Map();
+    const previous = new Map();
+    const unvisited = new Set(cells.map(c => c.id));
+    
+    distances.set(startCell.id, 0);
+    
+    while (unvisited.size > 0) {
+        // Find unvisited cell with smallest distance
+        let currentId = null;
+        let minDist = Infinity;
+        for (const id of unvisited) {
+            const dist = distances.get(id) ?? Infinity;
+            if (dist < minDist) {
+                minDist = dist;
+                currentId = id;
+            }
+        }
+        
+        if (currentId === null || minDist === Infinity) break;
+        if (currentId === endCell.id) break;
+        
+        unvisited.delete(currentId);
+        const current = cellMap.get(currentId);
+        
+        // Check all linked neighbors
+        for (const linkedId of current.links) {
+            if (!unvisited.has(linkedId)) continue;
+            const alt = minDist + 1;
+            const existingDist = distances.get(linkedId) ?? Infinity;
+            if (alt < existingDist) {
+                distances.set(linkedId, alt);
+                previous.set(linkedId, currentId);
+            }
+        }
+    }
+    
+    // Reconstruct path (just store cell IDs for efficiency)
+    const path = [];
+    let current = endCell.id;
+    while (current !== undefined) {
+        path.unshift(current);
+        current = previous.get(current);
+    }
+    
+    console.log('Solution path computed:', path.length, 'cells');
+    return path;
+}
