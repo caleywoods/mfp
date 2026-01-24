@@ -907,25 +907,29 @@ function buildMaze() {
     
     // Collect valid wall positions for torches
     cells.forEach(cell => {
-        const { row, col, links } = cell;
+        const { row, col, links, isStart, isEnd } = cell;
         const cellX = col * CELL_SIZE + CELL_SIZE / 2;
         const cellZ = row * CELL_SIZE + CELL_SIZE / 2;
+        const entranceDir = entranceMap.get(cell.id);
         
-        // Check each wall - add torch position if wall exists
+        // Skip entrance/exit cells entirely to avoid torches near rune markers
+        if (isStart || isEnd) return;
+        
+        // Check each wall - add torch position if wall exists AND it's not an entrance opening
         const northId = row > 0 ? (row - 1) * cols + col : null;
-        if (northId === null || !links.includes(northId)) {
+        if ((northId === null || !links.includes(northId)) && entranceDir !== 'north') {
             torchPositions.push({ x: cellX, z: cellZ - CELL_SIZE / 2 + 0.3, side: 'north' });
         }
         const southId = row < rows - 1 ? (row + 1) * cols + col : null;
-        if (row === rows - 1 || (southId !== null && !links.includes(southId))) {
+        if ((row === rows - 1 || (southId !== null && !links.includes(southId))) && entranceDir !== 'south') {
             torchPositions.push({ x: cellX, z: cellZ + CELL_SIZE / 2 - 0.3, side: 'south' });
         }
         const westId = col > 0 ? row * cols + (col - 1) : null;
-        if (westId === null || !links.includes(westId)) {
+        if ((westId === null || !links.includes(westId)) && entranceDir !== 'west') {
             torchPositions.push({ x: cellX - CELL_SIZE / 2 + 0.3, z: cellZ, side: 'west' });
         }
         const eastId = col < cols - 1 ? row * cols + (col + 1) : null;
-        if (col === cols - 1 || (eastId !== null && !links.includes(eastId))) {
+        if ((col === cols - 1 || (eastId !== null && !links.includes(eastId))) && entranceDir !== 'east') {
             torchPositions.push({ x: cellX + CELL_SIZE / 2 - 0.3, z: cellZ, side: 'east' });
         }
     });
