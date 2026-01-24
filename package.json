@@ -25,7 +25,9 @@
     "url": "https://github.com/caleywoods/mfp/issues"
   },
   "homepage": "https://github.com/caleywoods/mfp#readme",
-  "dependencies": {},
+  "dependencies": {
+    "three": "^0.182.0"
+  },
   "devDependencies": {
     "autoprefixer": "^10.4.0",
     "postcss": "^8.4.0",

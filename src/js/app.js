@@ -284,3 +284,15 @@ const saveAsImage = () => {
         quality: 1
     });
 }
+
+// Enter Maze 3D button
+document.querySelector('#enter-maze-btn').addEventListener('click', () => {
+    if (!maze) {
+        alert('Please generate a maze first!');
+        return;
+    }
+    
+    // Navigate to 3D maze page
+    // In Phase 2, we'll serialize maze data to localStorage before navigating
+    window.location.href = '/maze3d.html';
+});

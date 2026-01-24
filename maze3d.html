@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>MFP - 3D Maze</title>
+        <link rel="stylesheet" href="/src/sass/main.scss">
+        <style>
+            body {
+                margin: 0;
+                overflow: hidden;
+            }
+            #maze-container {
+                width: 100vw;
+                height: 100vh;
+                display: block;
+            }
+            #overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                padding: 1rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                pointer-events: none;
+                z-index: 100;
+            }
+            #overlay > * {
+                pointer-events: auto;
+            }
+            #instructions {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                text-align: center;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 2rem 3rem;
+                border-radius: 0.5rem;
+                z-index: 200;
+            }
+            #instructions h2 {
+                margin: 0 0 1rem 0;
+                font-size: 1.5rem;
+            }
+            #instructions p {
+                margin: 0.5rem 0;
+                font-size: 1rem;
+                opacity: 0.9;
+            }
+            #instructions .click-prompt {
+                margin-top: 1.5rem;
+                font-size: 0.875rem;
+                opacity: 0.7;
+            }
+            #crosshair {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 20px;
+                height: 20px;
+                pointer-events: none;
+                z-index: 50;
+            }
+            #crosshair::before,
+            #crosshair::after {
+                content: '';
+                position: absolute;
+                background: rgba(255, 255, 255, 0.7);
+            }
+            #crosshair::before {
+                width: 2px;
+                height: 100%;
+                left: 50%;
+                transform: translateX(-50%);
+            }
+            #crosshair::after {
+                width: 100%;
+                height: 2px;
+                top: 50%;
+                transform: translateY(-50%);
+            }
+            .hidden {
+                display: none !important;
+            }
+        </style>
+    </head>
+    <body class="bg-slate-900">
+        <div id="overlay">
+            <a href="/" class="flex items-center gap-2 bg-slate-800/80 backdrop-blur px-3 py-2 rounded-md hover:bg-slate-700/80 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span class="text-sm font-medium text-white">Exit Maze</span>
+            </a>
+        </div>
+
+        <div id="instructions">
+            <h2>3D Maze Explorer</h2>
+            <p><strong>WASD</strong> - Move</p>
+            <p><strong>Mouse</strong> - Look around</p>
+            <p><strong>ESC</strong> - Release mouse</p>
+            <p class="click-prompt">Click anywhere to start</p>
+        </div>
+
+        <div id="crosshair" class="hidden"></div>
+
+        <canvas id="maze-container"></canvas>
+
+        <script type="module" src="/src/js/maze3d.js"></script>
+    </body>
+</html>
