@@ -343,6 +343,9 @@ const saveAsImage = () => {
     });
 }
 
+// Save Image button
+document.querySelector('#save-image-btn').addEventListener('click', saveAsImage);
+
 // Enter Maze 3D button
 document.querySelector('#enter-maze-btn').addEventListener('click', () => {
     if (!maze) {

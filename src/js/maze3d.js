@@ -89,12 +89,12 @@ renderer.toneMappingExposure = 1.0;
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Start bright
 scene.add(ambientLight);
 const ambientIntensityStart = 0.8;
-const ambientIntensityTarget = 0.18; // Darker dungeon - wall torches provide extra light
+const ambientIntensityTarget = 0.12; // Darker dungeon - wall torches provide extra light
 
 // Overhead light - bright for overview, dim for dungeon
 const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
 const directionalIntensityStart = 1.2;
-const directionalIntensityTarget = 0.35; // Darker - rely more on torches
+const directionalIntensityTarget = 0.25; // Darker - rely more on torches
 const directionalColorStart = new THREE.Color(0xffffff);
 const directionalColorTarget = new THREE.Color(0x4466aa);
 directionalLight.position.set(10, 30, 10);
@@ -115,6 +115,7 @@ scene.add(directionalLight);
 const torchLight = new THREE.PointLight(0xff9955, 3.5, 22, 1.2);
 torchLight.position.set(0, 0, 0);
 camera.add(torchLight);
+
 scene.add(camera); // Need to add camera to scene for child lights to work
 
 // Controls
@@ -125,11 +126,20 @@ const moveState = {
     forward: false,
     backward: false,
     left: false,
-    right: false
+    right: false,
+    sprint: false,
+    jump: false
 };
 const velocity = new THREE.Vector3();
 const direction = new THREE.Vector3();
 const moveSpeed = 5.0;
+const sprintMultiplier = 1.6;
+
+// Jump physics
+let verticalVelocity = 0;
+const GRAVITY = 20;
+const JUMP_FORCE = 6;
+let isOnGround = true;
 
 // Collision detection
 const wallBoundingBoxes = [];
@@ -147,7 +157,7 @@ let spawnYaw = 0; // Rotation to face open corridor
 let skipMenuAfterDrop = false; // Skip showing menu after regeneration
 
 // Dungeon ambient music
-const dungeonMusic = new Audio('/dungeon002.ogg');
+const dungeonMusic = new Audio('/sounds/dungeon002.ogg');
 dungeonMusic.loop = true;
 dungeonMusic.volume = 0.4;
 let musicPlaying = false;
@@ -165,15 +175,92 @@ function toggleMusic() {
 }
 
 // Walking sound effect
-const walkingSound = new Audio('/walking.mp3');
+const walkingSound = new Audio('/sounds/walking.mp3');
 walkingSound.loop = true;
 walkingSound.volume = 0.5;
 let isWalking = false;
+
+// Victory sound effect
+const victorySound = new Audio('/sounds/victory.mp3');
+victorySound.volume = 0.7;
+let hasWon = false;
+let exitPosition = null; // Will be set when maze is built
+let exitDirection = null; // Direction player must go to exit (north/south/east/west)
 
 // Camera bob state
 let bobTime = 0;
 const BOB_SPEED = 12; // How fast the bob cycles
 const BOB_AMOUNT = 0.06; // How much vertical movement
+
+// Snow particle system
+let snowParticles = null;
+let snowEnabled = false;
+
+function createSnowParticles() {
+    const particleCount = 2000;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(particleCount * 3);
+    const velocities = new Float32Array(particleCount);
+    
+    for (let i = 0; i < particleCount; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 200;
+        positions[i * 3 + 1] = Math.random() * 50;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+        velocities[i] = 0.5 + Math.random() * 1.0;
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.userData.velocities = velocities;
+    
+    const material = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.15,
+        transparent: true,
+        opacity: 0.8,
+        depthWrite: false
+    });
+    
+    snowParticles = new THREE.Points(geometry, material);
+    snowParticles.visible = false;
+    scene.add(snowParticles);
+}
+
+function toggleSnow() {
+    snowEnabled = !snowEnabled;
+    if (snowParticles) {
+        snowParticles.visible = snowEnabled;
+    }
+    console.log('Snow:', snowEnabled ? 'enabled' : 'disabled');
+}
+
+function updateSnow() {
+    if (!snowEnabled || !snowParticles) return;
+    
+    const positions = snowParticles.geometry.attributes.position.array;
+    const velocities = snowParticles.geometry.userData.velocities;
+    
+    // Center snow around player
+    const centerX = camera.position.x;
+    const centerZ = camera.position.z;
+    
+    for (let i = 0; i < positions.length / 3; i++) {
+        // Fall down
+        positions[i * 3 + 1] -= velocities[i] * 0.1;
+        
+        // Slight drift
+        positions[i * 3] += Math.sin(performance.now() * 0.001 + i) * 0.01;
+        positions[i * 3 + 2] += Math.cos(performance.now() * 0.001 + i * 0.5) * 0.01;
+        
+        // Reset if below ground or too far from player
+        if (positions[i * 3 + 1] < 0) {
+            positions[i * 3] = centerX + (Math.random() - 0.5) * 100;
+            positions[i * 3 + 1] = 30 + Math.random() * 20;
+            positions[i * 3 + 2] = centerZ + (Math.random() - 0.5) * 100;
+        }
+    }
+    
+    snowParticles.geometry.attributes.position.needsUpdate = true;
+}
 
 // Pointer lock events
 controls.addEventListener('lock', () => {
@@ -238,6 +325,16 @@ document.addEventListener('keydown', (event) => {
         case 'ArrowRight':
             moveState.right = true;
             break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+            moveState.sprint = true;
+            break;
+        case 'Space':
+            if (isOnGround) {
+                verticalVelocity = JUMP_FORCE;
+                isOnGround = false;
+            }
+            break;
     }
 });
 
@@ -259,6 +356,10 @@ document.addEventListener('keyup', (event) => {
         case 'ArrowRight':
             moveState.right = false;
             break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+            moveState.sprint = false;
+            break;
     }
 });
 
@@ -276,9 +377,14 @@ const minimapCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
 let solutionPath = [];
 let solutionVisible = false;
 let solutionMeshes = [];
-let hintArrow = null;
+let solutionMaterial = null; // Shader material for pulsing effect
+
+// Hint state - wisp of light that travels along solution path
 let hintVisible = false;
 let hintTimeout = null;
+let hintWisp = null; // Wisp mesh group
+let hintWispPath = []; // Array of positions for wisp to follow
+let hintWispProgress = 0; // Current progress along path (0-1)
 
 // Build maze from loaded data or create test environment
 function buildMaze() {
@@ -299,19 +405,74 @@ function buildMaze() {
     const floorDepth = rows * CELL_SIZE;
     const floorGeometry = new THREE.PlaneGeometry(floorWidth, floorDepth);
     
-    // Create procedural floor texture
+    // Create procedural cobblestone floor texture
     const floorCanvas = document.createElement('canvas');
     floorCanvas.width = 128;
     floorCanvas.height = 128;
     const floorCtx = floorCanvas.getContext('2d');
-    floorCtx.fillStyle = '#3a3a3a';
+    
+    // Dark mortar base
+    floorCtx.fillStyle = '#1a1a1a';
     floorCtx.fillRect(0, 0, 128, 128);
-    floorCtx.fillStyle = '#444444';
-    floorCtx.fillRect(2, 2, 60, 60);
-    floorCtx.fillRect(66, 66, 60, 60);
-    floorCtx.fillStyle = '#4a4a4a';
-    floorCtx.fillRect(66, 2, 60, 60);
-    floorCtx.fillRect(2, 66, 60, 60);
+    
+    // Generate irregular cobblestones
+    const stones = [];
+    const stoneCount = 12 + Math.floor(Math.random() * 6);
+    
+    // Place stone centers with some randomness
+    for (let i = 0; i < stoneCount; i++) {
+        stones.push({
+            x: (i % 4) * 32 + 8 + Math.random() * 16,
+            y: Math.floor(i / 4) * 32 + 8 + Math.random() * 16,
+            size: 18 + Math.random() * 12,
+            shade: 0.5 + Math.random() * 0.3,
+            vertices: 6 + Math.floor(Math.random() * 4)
+        });
+    }
+    
+    // Draw each cobblestone as irregular polygon
+    stones.forEach(stone => {
+        const baseGray = Math.floor(55 * stone.shade);
+        
+        // Draw stone shape
+        floorCtx.beginPath();
+        for (let v = 0; v < stone.vertices; v++) {
+            const angle = (v / stone.vertices) * Math.PI * 2;
+            const radiusVariation = 0.7 + Math.random() * 0.3;
+            const px = stone.x + Math.cos(angle) * stone.size * 0.5 * radiusVariation;
+            const py = stone.y + Math.sin(angle) * stone.size * 0.5 * radiusVariation;
+            if (v === 0) floorCtx.moveTo(px, py);
+            else floorCtx.lineTo(px, py);
+        }
+        floorCtx.closePath();
+        
+        // Fill with varied gray
+        floorCtx.fillStyle = `rgb(${baseGray + 10}, ${baseGray + 8}, ${baseGray + 5})`;
+        floorCtx.fill();
+        
+        // Darker edge/outline
+        floorCtx.strokeStyle = `rgb(${baseGray - 15}, ${baseGray - 18}, ${baseGray - 20})`;
+        floorCtx.lineWidth = 2;
+        floorCtx.stroke();
+        
+        // Add surface texture - small specks
+        for (let s = 0; s < 8; s++) {
+            const sx = stone.x + (Math.random() - 0.5) * stone.size * 0.6;
+            const sy = stone.y + (Math.random() - 0.5) * stone.size * 0.6;
+            const speckBright = baseGray + (Math.random() - 0.5) * 25;
+            floorCtx.fillStyle = `rgb(${speckBright}, ${speckBright - 2}, ${speckBright - 5})`;
+            floorCtx.fillRect(sx, sy, 1 + Math.random() * 2, 1 + Math.random() * 2);
+        }
+    });
+    
+    // Add dirt/grime in mortar gaps
+    for (let i = 0; i < 80; i++) {
+        const x = Math.random() * 128;
+        const y = Math.random() * 128;
+        const brown = 15 + Math.floor(Math.random() * 15);
+        floorCtx.fillStyle = `rgba(${brown + 5}, ${brown}, ${brown - 5}, 0.6)`;
+        floorCtx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+    }
     
     const floorTexture = new THREE.CanvasTexture(floorCanvas);
     floorTexture.wrapS = THREE.RepeatWrapping;
@@ -327,6 +488,116 @@ function buildMaze() {
     floor.position.set(floorWidth / 2, 0, floorDepth / 2);
     floor.receiveShadow = true;
     scene.add(floor);
+    
+    // Exterior ground (grass/dirt) around the maze - extends to forest
+    const exteriorPadding = CELL_SIZE * 8; // How far the ground extends beyond maze
+    const exteriorCanvas = document.createElement('canvas');
+    exteriorCanvas.width = 128;
+    exteriorCanvas.height = 128;
+    const extCtx = exteriorCanvas.getContext('2d');
+    
+    // Base grass/dirt color
+    extCtx.fillStyle = '#2a3a25';
+    extCtx.fillRect(0, 0, 128, 128);
+    
+    // Add varied grass patches
+    for (let i = 0; i < 200; i++) {
+        const x = Math.random() * 128;
+        const y = Math.random() * 128;
+        const green = 30 + Math.floor(Math.random() * 30);
+        const brown = 20 + Math.floor(Math.random() * 15);
+        extCtx.fillStyle = Math.random() > 0.3 
+            ? `rgb(${brown}, ${green + 10}, ${brown - 5})`
+            : `rgb(${brown + 10}, ${brown + 5}, ${brown - 10})`;
+        extCtx.fillRect(x, y, 2 + Math.random() * 4, 2 + Math.random() * 4);
+    }
+    
+    // Add some darker patches (shadows/dirt)
+    for (let i = 0; i < 30; i++) {
+        const x = Math.random() * 128;
+        const y = Math.random() * 128;
+        extCtx.fillStyle = `rgba(15, 20, 12, 0.5)`;
+        extCtx.beginPath();
+        extCtx.arc(x, y, 3 + Math.random() * 8, 0, Math.PI * 2);
+        extCtx.fill();
+    }
+    
+    const exteriorTexture = new THREE.CanvasTexture(exteriorCanvas);
+    exteriorTexture.wrapS = THREE.RepeatWrapping;
+    exteriorTexture.wrapT = THREE.RepeatWrapping;
+    exteriorTexture.repeat.set(8, 8);
+    
+    const exteriorMaterial = new THREE.MeshStandardMaterial({
+        map: exteriorTexture,
+        roughness: 1.0
+    });
+    
+    // Create ground planes on all four sides of the maze
+    const extWidth = floorWidth + exteriorPadding * 2;
+    const extDepth = floorDepth + exteriorPadding * 2;
+    const exteriorGeo = new THREE.PlaneGeometry(extWidth, extDepth);
+    const exteriorGround = new THREE.Mesh(exteriorGeo, exteriorMaterial);
+    exteriorGround.rotation.x = -Math.PI / 2;
+    exteriorGround.position.set(floorWidth / 2, -0.01, floorDepth / 2); // Slightly below floor
+    exteriorGround.receiveShadow = true;
+    scene.add(exteriorGround);
+    
+    // Forest around the maze
+    const trunkMaterial = new THREE.MeshStandardMaterial({
+        color: 0x4a3525,
+        roughness: 0.9
+    });
+    
+    const foliageMaterial = new THREE.MeshStandardMaterial({
+        color: 0x1a4a2a,
+        roughness: 0.8,
+        flatShading: true
+    });
+    
+    const darkFoliageMaterial = new THREE.MeshStandardMaterial({
+        color: 0x0f3318,
+        roughness: 0.8,
+        flatShading: true
+    });
+    
+    const mazeCenterX = floorWidth / 2;
+    const mazeCenterZ = floorDepth / 2;
+    const forestMinDist = Math.max(floorWidth, floorDepth) * 0.55 + 3; // Start on grass near maze
+    const forestMaxDist = Math.max(floorWidth, floorDepth) * 1.5;
+    
+    // Create forest around the maze
+    const numTrees = 80;
+    for (let i = 0; i < numTrees; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = forestMinDist + Math.random() * (forestMaxDist - forestMinDist);
+        const x = mazeCenterX + Math.cos(angle) * dist;
+        const z = mazeCenterZ + Math.sin(angle) * dist;
+        
+        const treeHeight = 4 + Math.random() * 8;
+        const trunkHeight = treeHeight * 0.3;
+        const trunkRadius = 0.15 + Math.random() * 0.15;
+        
+        // Trunk
+        const trunkGeo = new THREE.CylinderGeometry(trunkRadius * 0.7, trunkRadius, trunkHeight, 6);
+        const trunk = new THREE.Mesh(trunkGeo, trunkMaterial);
+        trunk.position.set(x, trunkHeight / 2, z);
+        scene.add(trunk);
+        
+        // Foliage - stacked cones for pine tree look
+        const foliageMat = Math.random() > 0.5 ? foliageMaterial : darkFoliageMaterial;
+        const numLayers = 2 + Math.floor(Math.random() * 2);
+        for (let layer = 0; layer < numLayers; layer++) {
+            const layerHeight = (treeHeight - trunkHeight) / numLayers;
+            const layerRadius = (1.2 + Math.random() * 0.8) * (1 - layer * 0.25);
+            const layerY = trunkHeight + layer * layerHeight * 0.7 + layerHeight / 2;
+            
+            const foliageGeo = new THREE.ConeGeometry(layerRadius, layerHeight, 6 + Math.floor(Math.random() * 3));
+            const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+            foliage.position.set(x, layerY, z);
+            foliage.rotation.y = Math.random() * Math.PI;
+            scene.add(foliage);
+        }
+    }
 
     // Wall material - dark stone brick dungeon texture
     const wallCanvas = document.createElement('canvas');
@@ -369,14 +640,125 @@ function buildMaze() {
         wallCtx.fillRect(x, y, 2 + Math.random() * 3, 2 + Math.random() * 3);
     }
     
-    // Add some moss/dampness spots
-    for (let i = 0; i < 15; i++) {
-        const x = Math.random() * 128;
-        const y = Math.random() * 128;
-        wallCtx.fillStyle = `rgba(20, 40, 20, ${0.1 + Math.random() * 0.2})`;
-        wallCtx.beginPath();
-        wallCtx.arc(x, y, 3 + Math.random() * 5, 0, Math.PI * 2);
-        wallCtx.fill();
+    // Add dark streaks (soot/water damage) - vertical drips
+    const streakCount = 4 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < streakCount; i++) {
+        const streakX = Math.random() * 128;
+        const streakStartY = Math.random() * 40; // Start near top
+        const streakLength = 40 + Math.random() * 80;
+        const streakWidth = 3 + Math.random() * 8;
+        
+        // Draw streak with gradient fade
+        for (let y = 0; y < streakLength; y++) {
+            const progress = y / streakLength;
+            const alpha = 0.15 * (1 - progress * 0.7); // Fade out towards bottom
+            const wobble = Math.sin(y * 0.3) * 2; // Slight horizontal wobble
+            const width = streakWidth * (1 - progress * 0.3); // Narrow towards bottom
+            wallCtx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+            wallCtx.fillRect(streakX + wobble - width/2, streakStartY + y, width, 1);
+        }
+    }
+    
+    // Add torch soot marks (darker areas where torches would be mounted)
+    const sootCount = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < sootCount; i++) {
+        const sootX = 20 + Math.random() * 88;
+        const sootY = 10 + Math.random() * 30; // Upper portion of wall
+        
+        // Draw upward soot plume
+        for (let dy = 0; dy < 35; dy++) {
+            const spread = dy * 0.4;
+            const alpha = 0.2 * (1 - dy / 35);
+            for (let dx = -spread; dx <= spread; dx += 1) {
+                if (Math.random() > 0.3) {
+                    wallCtx.fillStyle = `rgba(0, 0, 0, ${alpha * Math.random()})`;
+                    wallCtx.fillRect(sootX + dx + (Math.random() - 0.5) * 3, sootY - dy, 1, 1);
+                }
+            }
+        }
+    }
+    
+    // Add organic moss patches - clumps of green/brown pixels
+    const mossClumpCount = 5 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < mossClumpCount; i++) {
+        // Moss tends to grow in lower, damper areas and in mortar cracks
+        const clumpX = Math.random() * 128;
+        const clumpY = 40 + Math.random() * 88; // Prefer lower half
+        const clumpSize = 8 + Math.random() * 15;
+        
+        // Create organic clump shape with varied pixels
+        const pixelCount = Math.floor(clumpSize * clumpSize * 0.4);
+        for (let p = 0; p < pixelCount; p++) {
+            // Organic distribution - denser in center
+            const angle = Math.random() * Math.PI * 2;
+            const dist = Math.random() * Math.random() * clumpSize; // Squared for center density
+            const px = clumpX + Math.cos(angle) * dist;
+            const py = clumpY + Math.sin(angle) * dist * 0.7; // Slightly flattened
+            
+            // Vary between greens and browns for organic look
+            const colorChoice = Math.random();
+            let r, g, b;
+            if (colorChoice < 0.4) {
+                // Dark green
+                r = 20 + Math.floor(Math.random() * 25);
+                g = 45 + Math.floor(Math.random() * 35);
+                b = 15 + Math.floor(Math.random() * 20);
+            } else if (colorChoice < 0.7) {
+                // Olive/yellow-green
+                r = 40 + Math.floor(Math.random() * 30);
+                g = 50 + Math.floor(Math.random() * 30);
+                b = 10 + Math.floor(Math.random() * 15);
+            } else {
+                // Brown/muddy
+                r = 35 + Math.floor(Math.random() * 25);
+                g = 30 + Math.floor(Math.random() * 20);
+                b = 15 + Math.floor(Math.random() * 15);
+            }
+            
+            // Vary alpha for depth
+            const alpha = 0.5 + Math.random() * 0.5;
+            wallCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            
+            // Vary pixel size for texture
+            const pixelSize = 1 + Math.floor(Math.random() * 2);
+            wallCtx.fillRect(px, py, pixelSize, pixelSize);
+        }
+        
+        // Add some scattered individual pixels around the clump for organic edges
+        const scatterCount = Math.floor(pixelCount * 0.3);
+        for (let s = 0; s < scatterCount; s++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = clumpSize + Math.random() * 6;
+            const px = clumpX + Math.cos(angle) * dist;
+            const py = clumpY + Math.sin(angle) * dist * 0.7;
+            
+            if (Math.random() > 0.5) {
+                // Green scatter
+                const g = 35 + Math.floor(Math.random() * 40);
+                wallCtx.fillStyle = `rgba(25, ${g}, 15, ${0.3 + Math.random() * 0.4})`;
+            } else {
+                // Brown scatter
+                wallCtx.fillStyle = `rgba(40, 32, 18, ${0.3 + Math.random() * 0.4})`;
+            }
+            wallCtx.fillRect(px, py, 1, 1);
+        }
+    }
+    
+    // Add moss in mortar lines (horizontal cracks between bricks)
+    for (let row = 1; row < 4; row++) {
+        const mortarY = row * brickHeight;
+        if (Math.random() > 0.4) { // 60% chance per mortar line
+            const startX = Math.random() * 60;
+            const length = 20 + Math.random() * 50;
+            for (let x = startX; x < startX + length; x += 1) {
+                if (Math.random() > 0.4) {
+                    const g = 40 + Math.floor(Math.random() * 35);
+                    const yOffset = (Math.random() - 0.5) * 3;
+                    wallCtx.fillStyle = `rgba(25, ${g}, 18, ${0.4 + Math.random() * 0.4})`;
+                    wallCtx.fillRect(x, mortarY + yOffset, 1 + Math.random(), 1 + Math.random());
+                }
+            }
+        }
     }
     
     const wallTexture = new THREE.CanvasTexture(wallCanvas);
@@ -435,7 +817,7 @@ function buildMaze() {
 
         // Add start/end markers
         if (isStart) {
-            addMarker(cellX, cellZ, 0x61D095);
+            addMarker(cellX, cellZ, false);
             // Set target position for drop-in animation
             targetPosition.set(cellX, PLAYER_HEIGHT, cellZ);
             
@@ -474,7 +856,10 @@ function buildMaze() {
             // to face along the solution path direction
         }
         if (isEnd) {
-            addMarker(cellX, cellZ, 0xFB5D55);
+            addMarker(cellX, cellZ, true);
+            // Store exit position and direction for victory detection
+            exitPosition = new THREE.Vector3(cellX, PLAYER_HEIGHT, cellZ);
+            exitDirection = entranceDir; // The direction the exit opens to
         }
     });
 
@@ -613,12 +998,101 @@ function buildMaze() {
     // Store flame data globally for animation
     window.flameData = flameData;
 
-    function addMarker(x, z, color) {
-        const geometry = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 16);
-        const material = new THREE.MeshStandardMaterial({ color });
-        const marker = new THREE.Mesh(geometry, material);
-        marker.position.set(x, 0.05, z);
-        scene.add(marker);
+    function addMarker(x, z, isExit) {
+        const markerGroup = new THREE.Group();
+        
+        if (isExit) {
+            // Exit: Glowing rune circle with skull-like pattern
+            // Stone ring base
+            const ringGeo = new THREE.RingGeometry(0.5, 0.7, 32);
+            const ringMat = new THREE.MeshStandardMaterial({
+                color: 0x2a2020,
+                roughness: 0.9,
+                side: THREE.DoubleSide
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.y = 0.02;
+            markerGroup.add(ring);
+            
+            // Inner glowing circle
+            const glowGeo = new THREE.CircleGeometry(0.45, 32);
+            const glowMat = new THREE.MeshBasicMaterial({
+                color: 0x991111,
+                transparent: true,
+                opacity: 0.6
+            });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            glow.rotation.x = -Math.PI / 2;
+            glow.position.y = 0.03;
+            markerGroup.add(glow);
+            
+            // Rune symbols (simple crossed lines)
+            const runeMat = new THREE.MeshBasicMaterial({ color: 0xff3333 });
+            const runeGeo = new THREE.BoxGeometry(0.6, 0.02, 0.05);
+            const rune1 = new THREE.Mesh(runeGeo, runeMat);
+            rune1.position.y = 0.04;
+            markerGroup.add(rune1);
+            const rune2 = new THREE.Mesh(runeGeo, runeMat);
+            rune2.rotation.y = Math.PI / 2;
+            rune2.position.y = 0.04;
+            markerGroup.add(rune2);
+            const rune3 = new THREE.Mesh(runeGeo, runeMat);
+            rune3.rotation.y = Math.PI / 4;
+            rune3.position.y = 0.04;
+            markerGroup.add(rune3);
+            const rune4 = new THREE.Mesh(runeGeo, runeMat);
+            rune4.rotation.y = -Math.PI / 4;
+            rune4.position.y = 0.04;
+            markerGroup.add(rune4);
+        } else {
+            // Entrance: Glowing rune circle (similar style to exit but green/teal)
+            // Stone ring base
+            const ringGeo = new THREE.RingGeometry(0.5, 0.7, 32);
+            const ringMat = new THREE.MeshStandardMaterial({
+                color: 0x252a25,
+                roughness: 0.9,
+                side: THREE.DoubleSide
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.y = 0.02;
+            markerGroup.add(ring);
+            
+            // Inner glowing circle
+            const glowGeo = new THREE.CircleGeometry(0.45, 32);
+            const glowMat = new THREE.MeshBasicMaterial({
+                color: 0x115533,
+                transparent: true,
+                opacity: 0.6
+            });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            glow.rotation.x = -Math.PI / 2;
+            glow.position.y = 0.03;
+            markerGroup.add(glow);
+            
+            // Rune symbols (simple crossed lines) - green/teal
+            const runeMat = new THREE.MeshBasicMaterial({ color: 0x33aa77 });
+            const runeGeo = new THREE.BoxGeometry(0.6, 0.02, 0.05);
+            const rune1 = new THREE.Mesh(runeGeo, runeMat);
+            rune1.position.y = 0.04;
+            markerGroup.add(rune1);
+            const rune2 = new THREE.Mesh(runeGeo, runeMat);
+            rune2.rotation.y = Math.PI / 2;
+            rune2.position.y = 0.04;
+            markerGroup.add(rune2);
+            const rune3 = new THREE.Mesh(runeGeo, runeMat);
+            rune3.rotation.y = Math.PI / 4;
+            rune3.position.y = 0.04;
+            markerGroup.add(rune3);
+            const rune4 = new THREE.Mesh(runeGeo, runeMat);
+            rune4.rotation.y = -Math.PI / 4;
+            rune4.position.y = 0.04;
+            markerGroup.add(rune4);
+        }
+        
+        markerGroup.position.set(x, 0, z);
+        scene.add(markerGroup);
     }
 
     console.log('Maze built:', rows, 'x', cols, 'cells');
@@ -686,20 +1160,23 @@ function createTestEnvironment() {
         scene.add(wall);
     });
 
-    const startGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 16);
-    const startMaterial = new THREE.MeshStandardMaterial({ color: 0x61D095 });
+    // Simple markers for test environment
+    const startMaterial = new THREE.MeshStandardMaterial({ color: 0x3a3a32 });
+    const startGeometry = new THREE.CylinderGeometry(0.5, 0.55, 0.08, 8);
     const startMarker = new THREE.Mesh(startGeometry, startMaterial);
-    startMarker.position.set(2, 0.05, 2);
+    startMarker.position.set(2, 0.04, 2);
     scene.add(startMarker);
 
-    const endGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 16);
-    const endMaterial = new THREE.MeshStandardMaterial({ color: 0xFB5D55 });
+    const endMaterial = new THREE.MeshBasicMaterial({ color: 0x991111, transparent: true, opacity: 0.6 });
+    const endGeometry = new THREE.CircleGeometry(0.5, 32);
     const endMarker = new THREE.Mesh(endGeometry, endMaterial);
-    endMarker.position.set(-2, 0.05, -2);
+    endMarker.rotation.x = -Math.PI / 2;
+    endMarker.position.set(-2, 0.03, -2);
     scene.add(endMarker);
 }
 
 buildMaze();
+createSnowParticles();
 
 // Handle window resize
 window.addEventListener('resize', () => {
@@ -777,11 +1254,15 @@ function animate() {
         // Check if player is moving
         const moving = moveState.forward || moveState.backward || moveState.left || moveState.right;
         
-        // Walking sound with fade-out
+        // Walking sound with fade-out and sprint speed adjustment
         if (moving && !isWalking) {
             walkingSound.volume = 0.5;
+            walkingSound.playbackRate = moveState.sprint ? 1.4 : 1.0;
             walkingSound.play().catch(e => {});
             isWalking = true;
+        } else if (moving && isWalking) {
+            // Adjust playback rate when sprint state changes
+            walkingSound.playbackRate = moveState.sprint ? 1.4 : 1.0;
         } else if (!moving && isWalking) {
             // Fade out over ~50ms instead of abrupt stop
             const fadeOut = () => {
@@ -798,12 +1279,26 @@ function animate() {
             isWalking = false;
         }
         
-        // Camera bob when walking
-        if (moving) {
-            bobTime += delta * BOB_SPEED;
+        // Jump physics
+        if (!isOnGround) {
+            verticalVelocity -= GRAVITY * delta;
+            camera.position.y += verticalVelocity * delta;
+            
+            // Land on ground
+            if (camera.position.y <= PLAYER_HEIGHT) {
+                camera.position.y = PLAYER_HEIGHT;
+                verticalVelocity = 0;
+                isOnGround = true;
+            }
+        }
+        
+        // Camera bob when walking (only on ground)
+        if (moving && isOnGround) {
+            const bobSpeed = moveState.sprint ? BOB_SPEED * 1.5 : BOB_SPEED;
+            bobTime += delta * bobSpeed;
             const bobOffset = Math.sin(bobTime) * BOB_AMOUNT;
             camera.position.y = PLAYER_HEIGHT + bobOffset;
-        } else {
+        } else if (isOnGround) {
             // Smoothly return to normal height when stopped
             bobTime = 0;
             camera.position.y += (PLAYER_HEIGHT - camera.position.y) * 0.1;
@@ -813,13 +1308,16 @@ function animate() {
         const oldX = camera.position.x;
         const oldZ = camera.position.z;
 
+        // Calculate current speed (sprint or normal)
+        const currentSpeed = moveState.sprint ? moveSpeed * sprintMultiplier : moveSpeed;
+
         // Apply movement
         if (moveState.forward || moveState.backward) {
-            velocity.z = direction.z * moveSpeed * delta;
+            velocity.z = direction.z * currentSpeed * delta;
             controls.moveForward(velocity.z);
         }
         if (moveState.left || moveState.right) {
-            velocity.x = direction.x * moveSpeed * delta;
+            velocity.x = direction.x * currentSpeed * delta;
             controls.moveRight(velocity.x);
         }
 
@@ -864,6 +1362,34 @@ function animate() {
         // Apply final position
         camera.position.x = posX;
         camera.position.z = posZ;
+        
+        // Check for victory (stepped through exit)
+        if (!hasWon && exitPosition && exitDirection) {
+            // Check if player has stepped past the exit boundary
+            let steppedThrough = false;
+            const margin = 0.5; // How far past the exit cell center
+            
+            switch (exitDirection) {
+                case 'north':
+                    steppedThrough = camera.position.z < exitPosition.z - CELL_SIZE / 2 - margin;
+                    break;
+                case 'south':
+                    steppedThrough = camera.position.z > exitPosition.z + CELL_SIZE / 2 + margin;
+                    break;
+                case 'west':
+                    steppedThrough = camera.position.x < exitPosition.x - CELL_SIZE / 2 - margin;
+                    break;
+                case 'east':
+                    steppedThrough = camera.position.x > exitPosition.x + CELL_SIZE / 2 + margin;
+                    break;
+            }
+            
+            if (steppedThrough) {
+                hasWon = true;
+                victorySound.play().catch(e => console.log('Victory sound failed:', e));
+                console.log('Victory! You escaped the dungeon!');
+            }
+        }
     }
 
     // Update minimap
@@ -895,6 +1421,41 @@ function animate() {
             }
         });
     }
+    
+    // Animate solution path fuse effect
+    if (solutionVisible && solutionMaterial && window.solutionCurve) {
+        solutionMaterial.uniforms.time.value = time * 0.001;
+        
+        // Find player's position along the solution curve
+        const playerPos = new THREE.Vector3(camera.position.x, 0.15, camera.position.z);
+        const curve = window.solutionCurve;
+        
+        // Sample curve to find closest point (approximate)
+        let closestT = 0;
+        let closestDist = Infinity;
+        const samples = 50;
+        for (let i = 0; i <= samples; i++) {
+            const t = i / samples;
+            const point = curve.getPoint(t);
+            const dist = playerPos.distanceToSquared(point);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closestT = t;
+            }
+        }
+        
+        // Smooth interpolation to avoid jankiness when player moves
+        const currentT = solutionMaterial.uniforms.playerT.value;
+        const lerpSpeed = 3.0 * delta; // Smooth follow
+        const smoothedT = currentT + (closestT - currentT) * Math.min(lerpSpeed, 1.0);
+        solutionMaterial.uniforms.playerT.value = smoothedT;
+    }
+    
+    // Update hint wisp
+    updateHintWisp();
+    
+    // Update snow particles
+    updateSnow();
 
     prevTime = time;
     renderer.render(scene, camera);
@@ -1045,6 +1606,10 @@ document.addEventListener('keydown', (event) => {
     if (event.code === 'KeyN') {
         toggleMusic();
     }
+    // Toggle snow with F key
+    if (event.code === 'KeyF') {
+        toggleSnow();
+    }
     // Regenerate maze with R key
     if (event.code === 'KeyR') {
         regenerateMaze();
@@ -1123,18 +1688,19 @@ function solveMaze() {
     return path;
 }
 
-// Create 3D path visualization - smooth flowing tube with embedded arrows
+// Create 3D path visualization - glowing path with directional pulse
 function createSolutionMeshes(path) {
     // Clear existing meshes
     solutionMeshes.forEach(mesh => scene.remove(mesh));
     solutionMeshes = [];
+    solutionMaterial = null;
     
     if (path.length < 2) return;
     
     // Create points for the path - use all points to respect maze walls
     const points = path.map(cell => new THREE.Vector3(
         cell.col * CELL_SIZE + CELL_SIZE / 2,
-        0.4, // Float slightly above ground
+        0.15, // Close to ground for ethereal glow
         cell.row * CELL_SIZE + CELL_SIZE / 2
     ));
     
@@ -1142,52 +1708,97 @@ function createSolutionMeshes(path) {
     const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.15);
     
     // More segments for smoother appearance
-    const tubeSegments = Math.max(path.length * 8, 64);
-    const tubeGeometry = new THREE.TubeGeometry(curve, tubeSegments, 0.12, 12, false);
-    // Golden/amber color that fits dungeon theme
-    const tubeMaterial = new THREE.MeshStandardMaterial({
-        color: 0xFFAA44,
+    const tubeSegments = Math.max(path.length * 12, 96);
+    const tubeGeometry = new THREE.TubeGeometry(curve, tubeSegments, 0.08, 6, false);
+    
+    // Calculate path length for UV mapping
+    const pathLength = curve.getLength();
+    
+    // Shader material for lit fuse effect - beam travels from player position ahead
+    solutionMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            time: { value: 0 },
+            playerT: { value: 0 }, // Player position along curve (0-1)
+            travelLength: { value: 0.15 }, // How far ahead the fuse travels (fraction of path)
+            baseColor: { value: new THREE.Color(0x0a2218) }, // Very dim base (unlit)
+            fuseColor: { value: new THREE.Color(0x66ffcc) }, // Bright traveling light
+            trailColor: { value: new THREE.Color(0x22aa66) } // Glowing trail behind
+        },
+        vertexShader: `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform float time;
+            uniform float playerT;
+            uniform float travelLength;
+            uniform vec3 baseColor;
+            uniform vec3 fuseColor;
+            uniform vec3 trailColor;
+            varying vec2 vUv;
+            
+            void main() {
+                // Fuse travels from player position to some cells ahead, then resets
+                float cycleTime = 2.5; // Seconds per cycle
+                float cycleProgress = fract(time / cycleTime);
+                
+                // Fuse position: starts at playerT, travels travelLength ahead
+                float fuseStart = playerT;
+                float fuseEnd = playerT + travelLength;
+                float fusePos = fuseStart + cycleProgress * travelLength;
+                
+                // Distance from the fuse head
+                float distFromFuse = vUv.x - fusePos;
+                
+                // Only show effect in the active region (from player to ahead)
+                float inRegion = step(fuseStart - 0.02, vUv.x) * step(vUv.x, fuseEnd + 0.02);
+                
+                // Bright fuse head
+                float fuseHead = smoothstep(0.02, 0.0, abs(distFromFuse)) * 1.8;
+                
+                // Trail behind fuse (within active region)
+                float behindFuse = step(vUv.x, fusePos);
+                float aheadOfStart = step(fuseStart, vUv.x);
+                float trail = behindFuse * aheadOfStart * 0.7;
+                
+                // Dim portion ahead of fuse but in region
+                float ahead = step(fusePos, vUv.x) * step(vUv.x, fuseEnd) * 0.25;
+                
+                // Very dim outside active region
+                float outside = (1.0 - inRegion) * 0.1;
+                
+                // Combine
+                float brightness = inRegion * max(fuseHead, max(trail, ahead)) + outside;
+                
+                // Colors
+                vec3 color = baseColor;
+                color = mix(color, trailColor, trail * inRegion);
+                color = mix(color, fuseColor, fuseHead * inRegion);
+                
+                // Edge softness
+                float edgeFade = 1.0 - pow(abs(vUv.y - 0.5) * 2.0, 2.0);
+                
+                float alpha = brightness * edgeFade * 0.85;
+                
+                gl_FragColor = vec4(color, alpha);
+            }
+        `,
         transparent: true,
-        opacity: 0.8,
-        emissive: 0xFFAA44,
-        emissiveIntensity: 0.6
+        side: THREE.DoubleSide,
+        depthWrite: false
     });
-    const tube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+    
+    const tube = new THREE.Mesh(tubeGeometry, solutionMaterial);
     scene.add(tube);
     solutionMeshes.push(tube);
     
-    // Add small direction indicators embedded in the tube
-    // Use the curve to get smooth positions and tangents
-    const arrowMaterial = new THREE.MeshStandardMaterial({
-        color: 0xFFDD88, // Lighter gold that blends with tube
-        emissive: 0xFFDD88,
-        emissiveIntensity: 0.7
-    });
+    // Store curve for player position tracking
+    window.solutionCurve = curve;
     
-    // Place small arrows along the curve at regular intervals
-    const numArrows = Math.max(5, Math.floor(path.length / 2));
-    for (let i = 1; i < numArrows; i++) {
-        const t = i / numArrows; // Parameter along curve (0 to 1)
-        const point = curve.getPoint(t);
-        const tangent = curve.getTangent(t);
-        
-        // Small cone arrow that fits within the tube width
-        const arrowGeo = new THREE.ConeGeometry(0.08, 0.25, 6);
-        const arrow = new THREE.Mesh(arrowGeo, arrowMaterial);
-        arrow.position.copy(point);
-        arrow.position.y += 0.15; // Slightly above the tube
-        
-        // Orient arrow along the tangent direction
-        const angle = Math.atan2(tangent.x, tangent.z);
-        arrow.rotation.order = 'YXZ';
-        arrow.rotation.y = angle;
-        arrow.rotation.x = Math.PI / 2;
-        
-        scene.add(arrow);
-        solutionMeshes.push(arrow);
-    }
-    
-    console.log('Solution path created:', path.length, 'cells,', numArrows - 1, 'arrows');
+    console.log('Solution path created:', path.length, 'cells');
 }
 
 // Toggle solution visibility
@@ -1210,7 +1821,7 @@ function toggleSolutionPath() {
     console.log('Solution path:', solutionVisible ? 'visible' : 'hidden');
 }
 
-// Show a hint - glowing floor arrow and short path segment
+// Show a hint - wisp of light that travels along the solution path
 function showHint() {
     if (solutionPath.length === 0) return;
     
@@ -1232,84 +1843,162 @@ function showHint() {
         }
     }
     
-    // Remove existing hint elements
-    if (hintArrow) {
-        if (Array.isArray(hintArrow)) {
-            hintArrow.forEach(obj => scene.remove(obj));
-        } else {
-            scene.remove(hintArrow);
-        }
-    }
     if (hintTimeout) {
         clearTimeout(hintTimeout);
     }
     
-    const hintElements = [];
-    const hintTileMaterial = new THREE.MeshStandardMaterial({
-        color: 0xFFD700, // Gold for tiles
-        emissive: 0xFFD700,
-        emissiveIntensity: 1.0,
-        transparent: true,
-        opacity: 0.9
-    });
-    const hintArrowMaterial = new THREE.MeshStandardMaterial({
-        color: 0xFF6B35, // Coral/orange for arrows - complements gold
-        emissive: 0xFF6B35,
-        emissiveIntensity: 1.0
-    });
+    // Build path for wisp to follow (starting just in front of player, then along solution path)
+    const endIndex = Math.min(pathIndex + 5, solutionPath.length - 1);
+    hintWispPath = [];
     
-    // Show next 3-5 cells of the path as glowing floor tiles
-    const showCells = Math.min(5, solutionPath.length - pathIndex);
-    for (let i = 0; i < showCells; i++) {
-        const idx = pathIndex + i;
-        if (idx >= solutionPath.length) break;
-        
-        const cell = solutionPath[idx];
-        const x = cell.col * CELL_SIZE + CELL_SIZE / 2;
-        const z = cell.row * CELL_SIZE + CELL_SIZE / 2;
-        
-        // Glowing floor tile
-        const tileGeo = new THREE.BoxGeometry(CELL_SIZE * 0.7, 0.08, CELL_SIZE * 0.7);
-        const tile = new THREE.Mesh(tileGeo, hintTileMaterial);
-        tile.position.set(x, 0.05, z);
-        scene.add(tile);
-        hintElements.push(tile);
-        
-        // Add arrow on floor pointing to next cell
-        if (idx < solutionPath.length - 1) {
-            const nextCell = solutionPath[idx + 1];
-            const nextX = nextCell.col * CELL_SIZE + CELL_SIZE / 2;
-            const nextZ = nextCell.row * CELL_SIZE + CELL_SIZE / 2;
-            
-            const arrowGeo = new THREE.ConeGeometry(0.3, 0.7, 8);
-            const arrow = new THREE.Mesh(arrowGeo, hintArrowMaterial);
-            arrow.position.set(x, 0.2, z);
-            
-            // Point toward next cell (rotate cone to lay flat and point direction)
-            // Cone points up (+Y) by default, rotate to point along travel direction
-            const angle = Math.atan2(nextX - x, nextZ - z);
-            arrow.rotation.order = 'YXZ';
-            arrow.rotation.y = angle;
-            arrow.rotation.x = Math.PI / 2;
-            
-            scene.add(arrow);
-            hintElements.push(arrow);
-        }
+    // First point: just in front of the player
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+    hintWispPath.push(new THREE.Vector3(
+        camera.position.x + forward.x * 1.5,
+        1.2,
+        camera.position.z + forward.z * 1.5
+    ));
+    
+    // Then follow the solution path
+    for (let i = pathIndex; i <= endIndex; i++) {
+        const cell = solutionPath[i];
+        hintWispPath.push(new THREE.Vector3(
+            cell.col * CELL_SIZE + CELL_SIZE / 2,
+            1.2, // Float at about waist height
+            cell.row * CELL_SIZE + CELL_SIZE / 2
+        ));
     }
     
-    hintArrow = hintElements;
+    hintWispProgress = 0;
     hintVisible = true;
     
-    // Remove after 4 seconds
+    // Hide after 5 seconds
     hintTimeout = setTimeout(() => {
-        if (hintArrow && Array.isArray(hintArrow)) {
-            hintArrow.forEach(obj => scene.remove(obj));
-            hintArrow = null;
-            hintVisible = false;
-        }
-    }, 4000);
+        hintVisible = false;
+        hintWispPath = [];
+    }, 5000);
     
-    console.log('Hint: Showing', showCells, 'cells from path index', pathIndex);
+    console.log('Hint: Wisp traveling from cell', pathIndex, 'to', endIndex);
+}
+
+// Update wisp position and appearance (called from animate loop)
+function updateHintWisp() {
+    if (!hintVisible || hintWispPath.length < 2) {
+        if (hintWisp) hintWisp.visible = false;
+        return;
+    }
+    
+    // Create wisp if it doesn't exist
+    if (!hintWisp) {
+        hintWisp = new THREE.Group();
+        
+        // Core glow sphere (smaller)
+        const coreGeo = new THREE.SphereGeometry(0.06, 12, 12);
+        const coreMat = new THREE.MeshBasicMaterial({
+            color: 0xaaffee,
+            transparent: true,
+            opacity: 0.9
+        });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        core.name = 'core';
+        hintWisp.add(core);
+        
+        // Outer glow (smaller, more transparent)
+        const glowGeo = new THREE.SphereGeometry(0.12, 12, 12);
+        const glowMat = new THREE.MeshBasicMaterial({
+            color: 0x44ffaa,
+            transparent: true,
+            opacity: 0.4
+        });
+        const glow = new THREE.Mesh(glowGeo, glowMat);
+        glow.name = 'glow';
+        hintWisp.add(glow);
+        
+        // Point light for the wisp (dimmer, shorter range)
+        const wispLight = new THREE.PointLight(0x44ffaa, 0.8, 4);
+        wispLight.name = 'light';
+        hintWisp.add(wispLight);
+        
+        scene.add(hintWisp);
+    }
+    
+    hintWisp.visible = true;
+    
+    // Check if player is moving forward (not backwards)
+    const playerMovingForward = moveState.forward || moveState.left || moveState.right;
+    
+    // Advance wisp along path only when player is moving forward
+    if (playerMovingForward && !moveState.backward) {
+        hintWispProgress += 0.003; // Slower speed of wisp travel
+        if (hintWispProgress > 1) hintWispProgress = 0; // Loop
+    }
+    
+    // Interpolate position along path
+    const totalSegments = hintWispPath.length - 1;
+    const progressAlongPath = hintWispProgress * totalSegments;
+    const segmentIndex = Math.floor(progressAlongPath);
+    const segmentProgress = progressAlongPath - segmentIndex;
+    
+    let wispX, wispZ;
+    if (segmentIndex < totalSegments) {
+        const p1 = hintWispPath[segmentIndex];
+        const p2 = hintWispPath[segmentIndex + 1];
+        
+        // Smooth interpolation
+        wispX = p1.x + (p2.x - p1.x) * segmentProgress;
+        wispZ = p1.z + (p2.z - p1.z) * segmentProgress;
+    } else {
+        // At end of path
+        const lastPoint = hintWispPath[hintWispPath.length - 1];
+        wispX = lastPoint.x;
+        wispZ = lastPoint.z;
+    }
+    
+    // Check if wisp is behind the player - if so, keep it in front
+    const toWisp = new THREE.Vector3(wispX - camera.position.x, 0, wispZ - camera.position.z);
+    const cameraForward = new THREE.Vector3();
+    camera.getWorldDirection(cameraForward);
+    cameraForward.y = 0;
+    cameraForward.normalize();
+    
+    const dot = toWisp.x * cameraForward.x + toWisp.z * cameraForward.z;
+    
+    // If wisp is behind player (dot < 0), place it in front instead
+    if (dot < 0.5) {
+        wispX = camera.position.x + cameraForward.x * 2.0;
+        wispZ = camera.position.z + cameraForward.z * 2.0;
+    }
+    
+    // Gentle bobbing motion
+    const time = performance.now() * 0.003;
+    const bobY = Math.sin(time * 2) * 0.1;
+    const bobX = Math.sin(time * 1.3) * 0.05;
+    
+    // Smooth lerp to target position to avoid jerkiness
+    const targetX = wispX + bobX;
+    const targetZ = wispZ;
+    const targetY = 1.2 + bobY;
+    
+    const lerpFactor = 0.08; // Smooth follow speed
+    hintWisp.position.x += (targetX - hintWisp.position.x) * lerpFactor;
+    hintWisp.position.y += (targetY - hintWisp.position.y) * lerpFactor;
+    hintWisp.position.z += (targetZ - hintWisp.position.z) * lerpFactor;
+    
+    // Pulsing glow effect
+    const pulse = 0.7 + 0.3 * Math.sin(performance.now() * 0.008);
+    const core = hintWisp.getObjectByName('core');
+    const glow = hintWisp.getObjectByName('glow');
+    const light = hintWisp.getObjectByName('light');
+    
+    if (core) core.material.opacity = pulse;
+    if (glow) {
+        glow.material.opacity = 0.3 + 0.2 * pulse;
+        glow.scale.setScalar(1 + 0.2 * Math.sin(performance.now() * 0.006));
+    }
+    if (light) light.intensity = 1.0 + 0.5 * pulse;
 }
 
 // Regenerate maze in 3D view
@@ -1451,7 +2140,25 @@ function regenerateMaze() {
     // Clear solution path
     solutionPath = [];
     solutionMeshes = [];
+    solutionMaterial = null;
     solutionVisible = false;
+    
+    // Clear hint state
+    hintVisible = false;
+    hintWispPath = [];
+    hintWispProgress = 0;
+    if (hintTimeout) {
+        clearTimeout(hintTimeout);
+        hintTimeout = null;
+    }
+    if (hintWisp) {
+        hintWisp.visible = false;
+    }
+    
+    // Reset victory state
+    hasWon = false;
+    exitPosition = null;
+    exitDirection = null;
     
     // Rebuild maze
     buildMaze();
