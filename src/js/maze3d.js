@@ -199,7 +199,7 @@ const WALL_HEIGHT = 3;    // Height of walls
 const WALL_THICKNESS = 0.2;
 
 // Minimap state
-let minimapVisible = true;
+let minimapVisible = false;
 const minimapCanvas = document.getElementById('minimap');
 const minimapCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
 
@@ -493,9 +493,14 @@ function animate() {
         camera.position.y = currentY;
         
         // Gradually rotate camera from looking down to looking forward
+        // Also smoothly rotate yaw towards the spawn direction
         const lookDownAngle = Math.PI / 2; // 90 degrees down
-        const currentAngle = lookDownAngle * (1 - eased);
-        camera.rotation.x = -currentAngle;
+        const currentPitch = lookDownAngle * (1 - eased);
+        const currentYaw = spawnYaw * eased; // Smoothly interpolate yaw from 0 to spawnYaw
+        
+        camera.rotation.order = 'YXZ'; // Ensure proper rotation order
+        camera.rotation.x = -currentPitch;
+        camera.rotation.y = currentYaw;
         
         if (progress >= 1) {
             isDropping = false;
