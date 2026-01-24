@@ -2160,6 +2160,14 @@ function regenerateMaze() {
     exitPosition = null;
     exitDirection = null;
     
+    // Stop walking sound
+    if (isWalking) {
+        walkingSound.pause();
+        walkingSound.currentTime = 0;
+        walkingSound.volume = 0.5;
+        isWalking = false;
+    }
+    
     // Rebuild maze
     buildMaze();
     
