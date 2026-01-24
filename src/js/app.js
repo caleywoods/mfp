@@ -44,9 +44,64 @@ const resizeMazeCanvas = (config) => {
     }
 };
 
-let maze = new Wilson(gridConfig.rows, gridConfig.cols, gridConfig);
-resizeMazeCanvas(gridConfig);
-maze.create()
+let maze = null;
+
+// Check if returning from 3D view with existing maze data
+const savedMazeData = localStorage.getItem('mazeData');
+if (savedMazeData) {
+    // Restore the saved maze instead of generating a new one
+    try {
+        const mazeJson = JSON.parse(savedMazeData);
+        // Update gridConfig to match saved maze
+        gridConfig.rows = mazeJson.rows;
+        gridConfig.cols = mazeJson.cols;
+        
+        // Create maze with saved dimensions
+        maze = new Wilson(gridConfig.rows, gridConfig.cols, gridConfig);
+        resizeMazeCanvas(gridConfig);
+        
+        // Rebuild the links from saved data
+        const cellMap = new Map();
+        maze.cells.flat().forEach(cell => cellMap.set(cell.id, cell));
+        
+        mazeJson.cells.forEach(savedCell => {
+            const cell = cellMap.get(savedCell.id);
+            if (cell) {
+                cell.isStart = savedCell.isStart;
+                cell.isEnd = savedCell.isEnd;
+                // Restore links
+                savedCell.links.forEach(linkedId => {
+                    const linkedCell = cellMap.get(linkedId);
+                    if (linkedCell && !cell.links.has(linkedCell)) {
+                        cell.link(linkedCell);
+                    }
+                });
+            }
+        });
+        
+        // Restore entrances
+        mazeJson.entrances.forEach(entrance => {
+            const cell = cellMap.get(entrance.cellId);
+            if (cell) {
+                maze.entrances.set(entrance.cellId, { direction: entrance.direction, cell });
+            }
+        });
+        
+        maze.draw();
+        console.log('Restored maze from localStorage');
+    } catch (e) {
+        console.error('Failed to restore maze:', e);
+        // Fall back to generating new maze
+        maze = new Wilson(gridConfig.rows, gridConfig.cols, gridConfig);
+        resizeMazeCanvas(gridConfig);
+        maze.create();
+    }
+} else {
+    // No saved maze, generate a new one
+    maze = new Wilson(gridConfig.rows, gridConfig.cols, gridConfig);
+    resizeMazeCanvas(gridConfig);
+    maze.create();
+}
 
 document.querySelector('#solve-btn').addEventListener('click', () => {
     // Redraw the maze to clear any previous solution
@@ -75,6 +130,9 @@ document.querySelector('#solve-btn').addEventListener('click', () => {
 });
 
 const generateMaze = (algo) => {
+    // Clear saved maze data when generating a new one
+    localStorage.removeItem('mazeData');
+    
     // Hide comparison table and solver stats when generating new maze
     const comparisonTable = document.querySelector('#comparison-table');
     comparisonTable.classList.add('max-h-0', 'opacity-0');

@@ -66,28 +66,37 @@ scene.fog = new THREE.Fog(0x1a1a2e, 15, 80);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.set(2, 1.6, 2); // Player height ~1.6 units
 
-// Renderer
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+// Renderer with improved antialiasing
+const renderer = new THREE.WebGLRenderer({ 
+    canvas, 
+    antialias: true,
+    powerPreference: 'high-performance'
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.VSMShadowMap; // Higher quality shadows
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
 
 // Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-directionalLight.position.set(10, 20, 10);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+directionalLight.position.set(10, 30, 10);
 directionalLight.castShadow = true;
-directionalLight.shadow.mapSize.width = 2048;
-directionalLight.shadow.mapSize.height = 2048;
+directionalLight.shadow.mapSize.width = 4096;
+directionalLight.shadow.mapSize.height = 4096;
 directionalLight.shadow.camera.near = 0.5;
-directionalLight.shadow.camera.far = 100;
-directionalLight.shadow.camera.left = -30;
-directionalLight.shadow.camera.right = 30;
-directionalLight.shadow.camera.top = 30;
-directionalLight.shadow.camera.bottom = -30;
+directionalLight.shadow.camera.far = 150;
+directionalLight.shadow.camera.left = -50;
+directionalLight.shadow.camera.right = 50;
+directionalLight.shadow.camera.top = 50;
+directionalLight.shadow.camera.bottom = -50;
+directionalLight.shadow.bias = -0.0001;
+directionalLight.shadow.radius = 2; // Soft shadow edges
 scene.add(directionalLight);
 
 // Controls
@@ -115,6 +124,7 @@ const DROP_DURATION = 2.0; // seconds
 const DROP_HEIGHT = 25;
 const PLAYER_HEIGHT = 1.6;
 let targetPosition = new THREE.Vector3(2, PLAYER_HEIGHT, 2);
+let spawnYaw = 0; // Rotation to face open corridor
 
 // Pointer lock events
 controls.addEventListener('lock', () => {
@@ -192,6 +202,11 @@ const WALL_THICKNESS = 0.2;
 let minimapVisible = true;
 const minimapCanvas = document.getElementById('minimap');
 const minimapCtx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
+
+// Solution path state
+let solutionPath = [];
+let solutionVisible = false;
+let solutionMeshes = [];
 
 // Build maze from loaded data or create test environment
 function buildMaze() {
@@ -326,6 +341,35 @@ function buildMaze() {
             // Position camera high above for drop-in
             camera.position.set(cellX, DROP_HEIGHT, cellZ);
             camera.lookAt(cellX, 0, cellZ);
+            
+            // Determine which direction has an open corridor
+            // Check links to find an open passage
+            const startCell = cell;
+            if (links.includes(cell.id - 1) && col > 0) {
+                // West is open
+                spawnYaw = Math.PI / 2;
+            } else if (links.includes(cell.id + 1) && col < cols - 1) {
+                // East is open
+                spawnYaw = -Math.PI / 2;
+            } else if (links.includes(cell.id - cols) && row > 0) {
+                // North is open
+                spawnYaw = Math.PI;
+            } else if (links.includes(cell.id + cols) && row < rows - 1) {
+                // South is open
+                spawnYaw = 0;
+            } else if (entranceDir === 'north') {
+                // Entrance is north, face south (into maze)
+                spawnYaw = 0;
+            } else if (entranceDir === 'south') {
+                // Entrance is south, face north
+                spawnYaw = Math.PI;
+            } else if (entranceDir === 'west') {
+                // Entrance is west, face east
+                spawnYaw = -Math.PI / 2;
+            } else if (entranceDir === 'east') {
+                // Entrance is east, face west
+                spawnYaw = Math.PI / 2;
+            }
         }
         if (isEnd) {
             addMarker(cellX, cellZ, 0xFB5D55);
@@ -456,7 +500,7 @@ function animate() {
         if (progress >= 1) {
             isDropping = false;
             camera.position.y = PLAYER_HEIGHT;
-            camera.rotation.x = 0;
+            camera.rotation.set(0, spawnYaw, 0);
             // Show instructions to click for pointer lock
             instructions.querySelector('h2').textContent = 'Ready!';
             instructions.querySelector('.click-prompt').textContent = 'Click to explore';
@@ -627,6 +671,159 @@ document.addEventListener('keydown', (event) => {
             minimapCanvas.style.display = minimapVisible ? 'block' : 'none';
         }
     }
+    // Toggle solution path with P key
+    if (event.code === 'KeyP') {
+        toggleSolutionPath();
+    }
 });
 
-console.log('3D Maze initialized. Click to start exploring! Press M to toggle minimap.');
+// Solve maze using Dijkstra and return path
+function solveMaze() {
+    if (!mazeData) return [];
+    
+    const { rows, cols, cells, entrances } = mazeData;
+    
+    // Build adjacency from cell links
+    const cellMap = new Map();
+    cells.forEach(c => cellMap.set(c.id, c));
+    
+    // Find start and end cells
+    let startCell = null;
+    let endCell = null;
+    cells.forEach(c => {
+        if (c.isStart) startCell = c;
+        if (c.isEnd) endCell = c;
+    });
+    
+    if (!startCell || !endCell) {
+        console.warn('No start or end cell found');
+        return [];
+    }
+    
+    // Dijkstra's algorithm
+    const distances = new Map();
+    const previous = new Map();
+    const unvisited = new Set(cells.map(c => c.id));
+    
+    distances.set(startCell.id, 0);
+    
+    while (unvisited.size > 0) {
+        // Find unvisited cell with smallest distance
+        let currentId = null;
+        let minDist = Infinity;
+        for (const id of unvisited) {
+            const dist = distances.get(id) ?? Infinity;
+            if (dist < minDist) {
+                minDist = dist;
+                currentId = id;
+            }
+        }
+        
+        if (currentId === null || minDist === Infinity) break;
+        if (currentId === endCell.id) break;
+        
+        unvisited.delete(currentId);
+        const current = cellMap.get(currentId);
+        
+        // Check all linked neighbors
+        for (const linkedId of current.links) {
+            if (!unvisited.has(linkedId)) continue;
+            const alt = minDist + 1;
+            const existingDist = distances.get(linkedId) ?? Infinity;
+            if (alt < existingDist) {
+                distances.set(linkedId, alt);
+                previous.set(linkedId, currentId);
+            }
+        }
+    }
+    
+    // Reconstruct path
+    const path = [];
+    let current = endCell.id;
+    while (current !== undefined) {
+        const cell = cellMap.get(current);
+        if (cell) path.unshift(cell);
+        current = previous.get(current);
+    }
+    
+    return path;
+}
+
+// Create 3D path visualization
+function createSolutionMeshes(path) {
+    // Clear existing meshes
+    solutionMeshes.forEach(mesh => scene.remove(mesh));
+    solutionMeshes = [];
+    
+    if (path.length === 0) return;
+    
+    const pathMaterial = new THREE.MeshStandardMaterial({
+        color: 0x61D095,
+        transparent: true,
+        opacity: 0.6,
+        emissive: 0x61D095,
+        emissiveIntensity: 0.3
+    });
+    
+    // Create path segments
+    for (let i = 0; i < path.length; i++) {
+        const cell = path[i];
+        const x = cell.col * CELL_SIZE + CELL_SIZE / 2;
+        const z = cell.row * CELL_SIZE + CELL_SIZE / 2;
+        
+        // Create a flat box for each cell in path
+        const geometry = new THREE.BoxGeometry(CELL_SIZE * 0.6, 0.05, CELL_SIZE * 0.6);
+        const mesh = new THREE.Mesh(geometry, pathMaterial);
+        mesh.position.set(x, 0.03, z);
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+        solutionMeshes.push(mesh);
+        
+        // Add connecting segments between cells
+        if (i < path.length - 1) {
+            const nextCell = path[i + 1];
+            const nextX = nextCell.col * CELL_SIZE + CELL_SIZE / 2;
+            const nextZ = nextCell.row * CELL_SIZE + CELL_SIZE / 2;
+            
+            const midX = (x + nextX) / 2;
+            const midZ = (z + nextZ) / 2;
+            const dx = nextX - x;
+            const dz = nextZ - z;
+            const length = Math.sqrt(dx * dx + dz * dz);
+            
+            const connectorGeo = new THREE.BoxGeometry(
+                dx !== 0 ? length * 0.3 : CELL_SIZE * 0.3,
+                0.05,
+                dz !== 0 ? length * 0.3 : CELL_SIZE * 0.3
+            );
+            const connector = new THREE.Mesh(connectorGeo, pathMaterial);
+            connector.position.set(midX, 0.03, midZ);
+            scene.add(connector);
+            solutionMeshes.push(connector);
+        }
+    }
+    
+    console.log('Solution path created:', path.length, 'cells');
+}
+
+// Toggle solution visibility
+function toggleSolutionPath() {
+    solutionVisible = !solutionVisible;
+    
+    if (solutionVisible) {
+        if (solutionPath.length === 0) {
+            solutionPath = solveMaze();
+            createSolutionMeshes(solutionPath);
+        } else {
+            // Show existing meshes
+            solutionMeshes.forEach(mesh => mesh.visible = true);
+        }
+    } else {
+        // Hide meshes
+        solutionMeshes.forEach(mesh => mesh.visible = false);
+    }
+    
+    console.log('Solution path:', solutionVisible ? 'visible' : 'hidden');
+}
+
+console.log('3D Maze initialized. Click to start exploring! Press M for minimap, P for solution path.');
