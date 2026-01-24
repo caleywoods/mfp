@@ -23,15 +23,15 @@ if (mazeDataString) {
 // Scene setup
 const scene = new THREE.Scene();
 
-// Create procedural skybox
+// Create procedural skybox - dark dungeon atmosphere
 function createSkybox() {
     const skyGeo = new THREE.SphereGeometry(500, 32, 32);
     const skyMat = new THREE.ShaderMaterial({
         uniforms: {
-            topColor: { value: new THREE.Color(0x0077be) },
-            bottomColor: { value: new THREE.Color(0x1a1a2e) },
+            topColor: { value: new THREE.Color(0x0a0a12) }, // Very dark blue-black
+            bottomColor: { value: new THREE.Color(0x1a0a0a) }, // Dark reddish black
             offset: { value: 20 },
-            exponent: { value: 0.4 }
+            exponent: { value: 0.6 }
         },
         vertexShader: `
             varying vec3 vWorldPosition;
@@ -60,10 +60,12 @@ function createSkybox() {
 const skybox = createSkybox();
 scene.add(skybox);
 
-// Fog that matches sky gradient (will be adjusted for large mazes)
-let fogNear = 15;
-let fogFar = 80;
-scene.fog = new THREE.Fog(0x1a1a2e, fogNear, fogFar);
+// Fog - starts distant for top-down view, transitions to close dungeon fog
+let fogNearTarget = 8;  // Final dungeon fog near
+let fogFarTarget = 40;  // Final dungeon fog far
+let fogNearStart = 50;  // Initial fog near (distant for top-down view)
+let fogFarStart = 200;  // Initial fog far
+scene.fog = new THREE.Fog(0x0a0808, fogNearStart, fogFarStart);
 
 // Camera
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -83,11 +85,18 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 
-// Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+// Lighting - starts bright for top-down view, transitions to dungeon atmosphere
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Start bright
 scene.add(ambientLight);
+const ambientIntensityStart = 0.8;
+const ambientIntensityTarget = 0.18; // Darker dungeon - wall torches provide extra light
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+// Overhead light - bright for overview, dim for dungeon
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+const directionalIntensityStart = 1.2;
+const directionalIntensityTarget = 0.35; // Darker - rely more on torches
+const directionalColorStart = new THREE.Color(0xffffff);
+const directionalColorTarget = new THREE.Color(0x4466aa);
 directionalLight.position.set(10, 30, 10);
 directionalLight.castShadow = true;
 directionalLight.shadow.mapSize.width = 4096;
@@ -99,8 +108,14 @@ directionalLight.shadow.camera.right = 50;
 directionalLight.shadow.camera.top = 50;
 directionalLight.shadow.camera.bottom = -50;
 directionalLight.shadow.bias = -0.0001;
-directionalLight.shadow.radius = 2; // Soft shadow edges
+directionalLight.shadow.radius = 2;
 scene.add(directionalLight);
+
+// Player torch light (follows camera) - brighter for better visibility
+const torchLight = new THREE.PointLight(0xff9955, 3.5, 22, 1.2);
+torchLight.position.set(0, 0, 0);
+camera.add(torchLight);
+scene.add(camera); // Need to add camera to scene for child lights to work
 
 // Controls
 const controls = new PointerLockControls(camera, document.body);
@@ -131,6 +146,35 @@ let dropStartPosition = new THREE.Vector3(2, 25, 2); // Starting position for dr
 let spawnYaw = 0; // Rotation to face open corridor
 let skipMenuAfterDrop = false; // Skip showing menu after regeneration
 
+// Dungeon ambient music
+const dungeonMusic = new Audio('/dungeon002.ogg');
+dungeonMusic.loop = true;
+dungeonMusic.volume = 0.4;
+let musicPlaying = false;
+
+function toggleMusic() {
+    if (musicPlaying) {
+        dungeonMusic.pause();
+        musicPlaying = false;
+        console.log('Music paused');
+    } else {
+        dungeonMusic.play().catch(e => console.log('Audio play failed:', e));
+        musicPlaying = true;
+        console.log('Music playing');
+    }
+}
+
+// Walking sound effect
+const walkingSound = new Audio('/walking.mp3');
+walkingSound.loop = true;
+walkingSound.volume = 0.5;
+let isWalking = false;
+
+// Camera bob state
+let bobTime = 0;
+const BOB_SPEED = 12; // How fast the bob cycles
+const BOB_AMOUNT = 0.06; // How much vertical movement
+
 // Pointer lock events
 controls.addEventListener('lock', () => {
     if (!isDropping) {
@@ -142,6 +186,20 @@ controls.addEventListener('lock', () => {
 controls.addEventListener('unlock', () => {
     instructions.classList.remove('hidden');
     crosshair.classList.add('hidden');
+    
+    // Reset movement state when pointer lock is released
+    // Prevents stuck movement if keys were held when ESC was pressed
+    moveState.forward = false;
+    moveState.backward = false;
+    moveState.left = false;
+    moveState.right = false;
+    
+    // Stop walking sound
+    if (isWalking) {
+        walkingSound.pause();
+        walkingSound.currentTime = 0;
+        isWalking = false;
+    }
 });
 
 // Click to start
@@ -150,6 +208,12 @@ instructions.addEventListener('click', () => {
         // Start the drop animation
         dropStartTime = performance.now();
         instructions.classList.add('hidden');
+        
+        // Start music on first interaction (browsers require user gesture)
+        if (!musicPlaying) {
+            dungeonMusic.play().catch(e => console.log('Audio play failed:', e));
+            musicPlaying = true;
+        }
     } else {
         controls.lock();
     }
@@ -264,33 +328,55 @@ function buildMaze() {
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // Wall material with procedural texture
+    // Wall material - dark stone brick dungeon texture
     const wallCanvas = document.createElement('canvas');
-    wallCanvas.width = 64;
+    wallCanvas.width = 128;
     wallCanvas.height = 128;
     const wallCtx = wallCanvas.getContext('2d');
-    // Stone-like gradient
-    const gradient = wallCtx.createLinearGradient(0, 0, 0, 128);
-    gradient.addColorStop(0, '#7a7a7a');
-    gradient.addColorStop(0.5, '#666666');
-    gradient.addColorStop(1, '#555555');
-    wallCtx.fillStyle = gradient;
-    wallCtx.fillRect(0, 0, 64, 128);
-    // Add some noise/texture
-    wallCtx.fillStyle = 'rgba(0,0,0,0.1)';
-    for (let i = 0; i < 50; i++) {
-        const x = Math.random() * 64;
-        const y = Math.random() * 128;
-        wallCtx.fillRect(x, y, 2, 2);
+    
+    // Dark stone base
+    wallCtx.fillStyle = '#2a2a2a';
+    wallCtx.fillRect(0, 0, 128, 128);
+    
+    // Draw stone bricks
+    const brickHeight = 32;
+    const brickWidth = 64;
+    wallCtx.strokeStyle = '#1a1a1a';
+    wallCtx.lineWidth = 3;
+    
+    for (let row = 0; row < 4; row++) {
+        const offset = (row % 2) * (brickWidth / 2);
+        for (let col = -1; col < 3; col++) {
+            const x = col * brickWidth + offset;
+            const y = row * brickHeight;
+            
+            // Brick variation
+            const shade = 0.15 + Math.random() * 0.15;
+            wallCtx.fillStyle = `rgb(${Math.floor(42 * shade * 5)}, ${Math.floor(38 * shade * 5)}, ${Math.floor(35 * shade * 5)})`;
+            wallCtx.fillRect(x + 2, y + 2, brickWidth - 4, brickHeight - 4);
+            
+            // Brick outline (mortar)
+            wallCtx.strokeRect(x, y, brickWidth, brickHeight);
+        }
     }
-    // Horizontal lines for bricks
-    wallCtx.strokeStyle = 'rgba(0,0,0,0.2)';
-    wallCtx.lineWidth = 1;
-    for (let y = 0; y < 128; y += 32) {
+    
+    // Add noise/weathering
+    for (let i = 0; i < 200; i++) {
+        const x = Math.random() * 128;
+        const y = Math.random() * 128;
+        const brightness = Math.random() * 30;
+        wallCtx.fillStyle = `rgba(${brightness}, ${brightness}, ${brightness}, 0.3)`;
+        wallCtx.fillRect(x, y, 2 + Math.random() * 3, 2 + Math.random() * 3);
+    }
+    
+    // Add some moss/dampness spots
+    for (let i = 0; i < 15; i++) {
+        const x = Math.random() * 128;
+        const y = Math.random() * 128;
+        wallCtx.fillStyle = `rgba(20, 40, 20, ${0.1 + Math.random() * 0.2})`;
         wallCtx.beginPath();
-        wallCtx.moveTo(0, y);
-        wallCtx.lineTo(64, y);
-        wallCtx.stroke();
+        wallCtx.arc(x, y, 3 + Math.random() * 5, 0, Math.PI * 2);
+        wallCtx.fill();
     }
     
     const wallTexture = new THREE.CanvasTexture(wallCanvas);
@@ -299,7 +385,8 @@ function buildMaze() {
     
     const wallMaterial = new THREE.MeshStandardMaterial({ 
         map: wallTexture,
-        roughness: 0.8
+        roughness: 0.95,
+        metalness: 0.05
     });
 
     // Create entrance lookup
@@ -362,16 +449,17 @@ function buildMaze() {
             const fovRad = (75 / 2) * (Math.PI / 180);
             dropHeight = Math.max(25, (maxDimension / 2) / Math.tan(fovRad) * 1.2);
             
-            // Adjust fog and camera far plane for large mazes
+            // Adjust fog start values and targets for large mazes
             const requiredViewDistance = dropHeight * 1.5;
-            if (requiredViewDistance > fogFar) {
-                fogFar = requiredViewDistance + 50;
-                fogNear = Math.max(15, dropHeight * 0.3);
-                scene.fog.near = fogNear;
-                scene.fog.far = fogFar;
-                camera.far = Math.max(1000, fogFar + 100);
+            if (requiredViewDistance > fogFarStart) {
+                fogFarStart = requiredViewDistance + 50;
+                fogNearStart = Math.max(30, dropHeight * 0.3);
+                // Set initial fog for top-down view
+                scene.fog.near = fogNearStart;
+                scene.fog.far = fogFarStart;
+                camera.far = Math.max(1000, fogFarStart + 100);
                 camera.updateProjectionMatrix();
-                console.log('Adjusted fog for large maze:', fogNear, '-', fogFar);
+                console.log('Adjusted fog for large maze:', fogNearStart, '-', fogFarStart);
             }
             
             // Center camera over maze center for drop-in view
@@ -425,6 +513,105 @@ function buildMaze() {
         scene.add(wallsMesh);
         console.log('Merged', wallGeometries.length, 'walls into single mesh');
     }
+    
+    // Add random wall torches
+    // Scale with maze size but cap at 15 to avoid overwhelming WebGL with point lights
+    // For very large mazes, torches are spread out more
+    const torchCount = Math.min(15, Math.max(4, Math.floor((rows * cols) / 20)));
+    const torchPositions = [];
+    
+    // Collect valid wall positions for torches
+    cells.forEach(cell => {
+        const { row, col, links } = cell;
+        const cellX = col * CELL_SIZE + CELL_SIZE / 2;
+        const cellZ = row * CELL_SIZE + CELL_SIZE / 2;
+        
+        // Check each wall - add torch position if wall exists
+        const northId = row > 0 ? (row - 1) * cols + col : null;
+        if (northId === null || !links.includes(northId)) {
+            torchPositions.push({ x: cellX, z: cellZ - CELL_SIZE / 2 + 0.3, side: 'north' });
+        }
+        const southId = row < rows - 1 ? (row + 1) * cols + col : null;
+        if (row === rows - 1 || (southId !== null && !links.includes(southId))) {
+            torchPositions.push({ x: cellX, z: cellZ + CELL_SIZE / 2 - 0.3, side: 'south' });
+        }
+        const westId = col > 0 ? row * cols + (col - 1) : null;
+        if (westId === null || !links.includes(westId)) {
+            torchPositions.push({ x: cellX - CELL_SIZE / 2 + 0.3, z: cellZ, side: 'west' });
+        }
+        const eastId = col < cols - 1 ? row * cols + (col + 1) : null;
+        if (col === cols - 1 || (eastId !== null && !links.includes(eastId))) {
+            torchPositions.push({ x: cellX + CELL_SIZE / 2 - 0.3, z: cellZ, side: 'east' });
+        }
+    });
+    
+    // Randomly select torch positions
+    const shuffled = torchPositions.sort(() => Math.random() - 0.5);
+    const selectedTorches = shuffled.slice(0, torchCount);
+    
+    // Create torch meshes and lights
+    const torchMaterial = new THREE.MeshStandardMaterial({
+        color: 0x4a3728,
+        roughness: 0.9
+    });
+    const flameMaterial = new THREE.MeshStandardMaterial({
+        color: 0xff6600,
+        emissive: 0xff4400,
+        emissiveIntensity: 2.0
+    });
+    
+    // Store flames and lights for animation
+    const flameData = [];
+    
+    // First batch: torches WITH point lights (limited for performance)
+    const litTorchCount = Math.min(12, selectedTorches.length);
+    selectedTorches.slice(0, litTorchCount).forEach((pos, i) => {
+        // Torch holder (small cylinder)
+        const holderGeo = new THREE.CylinderGeometry(0.05, 0.07, 0.3, 8);
+        const holder = new THREE.Mesh(holderGeo, torchMaterial);
+        holder.position.set(pos.x, 1.8, pos.z);
+        scene.add(holder);
+        
+        // Flame (small sphere with emissive)
+        const flameGeo = new THREE.SphereGeometry(0.1, 8, 8);
+        const flame = new THREE.Mesh(flameGeo, flameMaterial.clone());
+        flame.position.set(pos.x, 2.0, pos.z);
+        scene.add(flame);
+        
+        // Point light for the torch
+        const wallTorchLight = new THREE.PointLight(0xff6622, 1.0, 8, 2);
+        wallTorchLight.position.set(pos.x, 2.0, pos.z);
+        scene.add(wallTorchLight);
+        
+        // Store for animation
+        flameData.push({ flame, light: wallTorchLight, baseY: 2.0, phase: Math.random() * Math.PI * 2 });
+    });
+    
+    // Additional visual-only torches for larger mazes (no point light, just emissive glow)
+    const extraTorchCount = Math.min(25, Math.floor((rows * cols) / 12)) - litTorchCount;
+    if (extraTorchCount > 0) {
+        const extraTorches = shuffled.slice(litTorchCount, litTorchCount + extraTorchCount);
+        extraTorches.forEach((pos, i) => {
+            const holderGeo = new THREE.CylinderGeometry(0.05, 0.07, 0.3, 8);
+            const holder = new THREE.Mesh(holderGeo, torchMaterial);
+            holder.position.set(pos.x, 1.8, pos.z);
+            scene.add(holder);
+            
+            const flameGeo = new THREE.SphereGeometry(0.1, 8, 8);
+            const flame = new THREE.Mesh(flameGeo, flameMaterial.clone());
+            flame.position.set(pos.x, 2.0, pos.z);
+            scene.add(flame);
+            
+            // Store for animation (no light)
+            flameData.push({ flame, light: null, baseY: 2.0, phase: Math.random() * Math.PI * 2 });
+        });
+        console.log('Added', litTorchCount, 'lit torches +', extraTorches.length, 'visual torches');
+    } else {
+        console.log('Added', litTorchCount, 'wall torches');
+    }
+    
+    // Store flame data globally for animation
+    window.flameData = flameData;
 
     function addMarker(x, z, color) {
         const geometry = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 16);
@@ -544,6 +731,15 @@ function animate() {
         const currentZ = dropStartPosition.z + (targetPosition.z - dropStartPosition.z) * eased;
         camera.position.set(currentX, currentY, currentZ);
         
+        // Transition fog from distant (top-down view) to close (dungeon atmosphere)
+        scene.fog.near = fogNearStart + (fogNearTarget - fogNearStart) * eased;
+        scene.fog.far = fogFarStart + (fogFarTarget - fogFarStart) * eased;
+        
+        // Transition lighting from bright (overview) to dark (dungeon)
+        ambientLight.intensity = ambientIntensityStart + (ambientIntensityTarget - ambientIntensityStart) * eased;
+        directionalLight.intensity = directionalIntensityStart + (directionalIntensityTarget - directionalIntensityStart) * eased;
+        directionalLight.color.lerpColors(directionalColorStart, directionalColorTarget, eased);
+        
         // Gradually rotate camera from looking down to looking forward
         // Also smoothly rotate yaw towards the spawn direction
         const lookDownAngle = Math.PI / 2; // 90 degrees down
@@ -577,6 +773,41 @@ function animate() {
         direction.z = Number(moveState.forward) - Number(moveState.backward);
         direction.x = Number(moveState.right) - Number(moveState.left);
         direction.normalize();
+        
+        // Check if player is moving
+        const moving = moveState.forward || moveState.backward || moveState.left || moveState.right;
+        
+        // Walking sound with fade-out
+        if (moving && !isWalking) {
+            walkingSound.volume = 0.5;
+            walkingSound.play().catch(e => {});
+            isWalking = true;
+        } else if (!moving && isWalking) {
+            // Fade out over ~50ms instead of abrupt stop
+            const fadeOut = () => {
+                if (walkingSound.volume > 0.05) {
+                    walkingSound.volume -= 0.15;
+                    setTimeout(fadeOut, 15);
+                } else {
+                    walkingSound.pause();
+                    walkingSound.currentTime = 0;
+                    walkingSound.volume = 0.5;
+                }
+            };
+            fadeOut();
+            isWalking = false;
+        }
+        
+        // Camera bob when walking
+        if (moving) {
+            bobTime += delta * BOB_SPEED;
+            const bobOffset = Math.sin(bobTime) * BOB_AMOUNT;
+            camera.position.y = PLAYER_HEIGHT + bobOffset;
+        } else {
+            // Smoothly return to normal height when stopped
+            bobTime = 0;
+            camera.position.y += (PLAYER_HEIGHT - camera.position.y) * 0.1;
+        }
 
         // Store old position for collision resolution
         const oldX = camera.position.x;
@@ -593,8 +824,9 @@ function animate() {
         }
 
         // Collision detection - check new position against walls
-        const newX = camera.position.x;
-        const newZ = camera.position.z;
+        let posX = camera.position.x;
+        let posZ = camera.position.z;
+        let collisionResolved = false;
 
         for (const box of wallBoundingBoxes) {
             // Expand box by player radius for circle-box collision
@@ -603,31 +835,65 @@ function animate() {
             const expandedMinZ = box.minZ - PLAYER_RADIUS;
             const expandedMaxZ = box.maxZ + PLAYER_RADIUS;
 
-            if (newX > expandedMinX && newX < expandedMaxX &&
-                newZ > expandedMinZ && newZ < expandedMaxZ) {
+            if (posX > expandedMinX && posX < expandedMaxX &&
+                posZ > expandedMinZ && posZ < expandedMaxZ) {
                 // Collision detected - resolve by pushing back
-                // Try X-only movement
-                if (!(newX > expandedMinX && newX < expandedMaxX &&
-                      oldZ > expandedMinZ && oldZ < expandedMaxZ)) {
-                    camera.position.z = oldZ;
-                }
-                // Try Z-only movement
-                else if (!(oldX > expandedMinX && oldX < expandedMaxX &&
-                           newZ > expandedMinZ && newZ < expandedMaxZ)) {
-                    camera.position.x = oldX;
-                }
-                // Both blocked, revert fully
-                else {
-                    camera.position.x = oldX;
-                    camera.position.z = oldZ;
+                // Try keeping X movement, revert Z
+                const xOnlyCollides = posX > expandedMinX && posX < expandedMaxX &&
+                                      oldZ > expandedMinZ && oldZ < expandedMaxZ;
+                // Try keeping Z movement, revert X
+                const zOnlyCollides = oldX > expandedMinX && oldX < expandedMaxX &&
+                                      posZ > expandedMinZ && posZ < expandedMaxZ;
+                
+                if (!xOnlyCollides && zOnlyCollides) {
+                    // X movement is safe, revert Z
+                    posZ = oldZ;
+                } else if (xOnlyCollides && !zOnlyCollides) {
+                    // Z movement is safe, revert X
+                    posX = oldX;
+                } else {
+                    // Both blocked or neither works, revert fully
+                    posX = oldX;
+                    posZ = oldZ;
+                    collisionResolved = true;
+                    break; // Can't move at all, stop checking
                 }
             }
         }
+        
+        // Apply final position
+        camera.position.x = posX;
+        camera.position.z = posZ;
     }
 
     // Update minimap
     if (minimapVisible && minimapCtx && mazeData) {
         drawMinimap();
+    }
+    
+    // Animate torch flames (cheap old-school flickering)
+    if (window.flameData) {
+        const flameTime = time * 0.005; // Slow down animation
+        window.flameData.forEach(data => {
+            const { flame, light, baseY, phase } = data;
+            
+            // Subtle vertical bobbing
+            const bob = Math.sin(flameTime * 3 + phase) * 0.03;
+            flame.position.y = baseY + bob;
+            
+            // Scale flickering (squash and stretch)
+            const scaleFlicker = 0.9 + Math.sin(flameTime * 8 + phase) * 0.15;
+            flame.scale.set(scaleFlicker, 1.1 / scaleFlicker, scaleFlicker);
+            
+            // Emissive intensity flicker
+            const intensityFlicker = 1.8 + Math.sin(flameTime * 6 + phase * 2) * 0.4;
+            flame.material.emissiveIntensity = intensityFlicker;
+            
+            // Light intensity flicker (if has light)
+            if (light) {
+                light.intensity = 0.8 + Math.sin(flameTime * 5 + phase) * 0.3;
+            }
+        });
     }
 
     prevTime = time;
@@ -775,6 +1041,10 @@ document.addEventListener('keydown', (event) => {
     if (event.code === 'KeyH') {
         showHint();
     }
+    // Toggle music with N key
+    if (event.code === 'KeyN') {
+        toggleMusic();
+    }
     // Regenerate maze with R key
     if (event.code === 'KeyR') {
         regenerateMaze();
@@ -853,7 +1123,7 @@ function solveMaze() {
     return path;
 }
 
-// Create 3D path visualization - floating line with arrows
+// Create 3D path visualization - smooth flowing tube with embedded arrows
 function createSolutionMeshes(path) {
     // Clear existing meshes
     solutionMeshes.forEach(mesh => scene.remove(mesh));
@@ -861,52 +1131,54 @@ function createSolutionMeshes(path) {
     
     if (path.length < 2) return;
     
-    // Create a glowing line path using tubes
+    // Create points for the path - use all points to respect maze walls
     const points = path.map(cell => new THREE.Vector3(
         cell.col * CELL_SIZE + CELL_SIZE / 2,
-        0.5, // Float slightly above ground
+        0.4, // Float slightly above ground
         cell.row * CELL_SIZE + CELL_SIZE / 2
     ));
     
-    const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.2);
-    const tubeGeometry = new THREE.TubeGeometry(curve, path.length * 4, 0.08, 8, false);
+    // Use lower tension for tighter corners that stay within corridors
+    const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.15);
+    
+    // More segments for smoother appearance
+    const tubeSegments = Math.max(path.length * 8, 64);
+    const tubeGeometry = new THREE.TubeGeometry(curve, tubeSegments, 0.12, 12, false);
+    // Golden/amber color that fits dungeon theme
     const tubeMaterial = new THREE.MeshStandardMaterial({
-        color: 0x61D095,
+        color: 0xFFAA44,
         transparent: true,
-        opacity: 0.7,
-        emissive: 0x61D095,
-        emissiveIntensity: 0.5
+        opacity: 0.8,
+        emissive: 0xFFAA44,
+        emissiveIntensity: 0.6
     });
     const tube = new THREE.Mesh(tubeGeometry, tubeMaterial);
     scene.add(tube);
     solutionMeshes.push(tube);
     
-    // Add direction arrows along the path - bright white for visibility
+    // Add small direction indicators embedded in the tube
+    // Use the curve to get smooth positions and tangents
     const arrowMaterial = new THREE.MeshStandardMaterial({
-        color: 0xFFFFFF,
-        emissive: 0xFFFFFF,
-        emissiveIntensity: 0.8
+        color: 0xFFDD88, // Lighter gold that blends with tube
+        emissive: 0xFFDD88,
+        emissiveIntensity: 0.7
     });
     
-    // Place arrows every 2-3 cells, starting from cell 1
-    const arrowInterval = Math.max(2, Math.min(3, Math.floor(path.length / 8)));
-    for (let i = 1; i < path.length - 1; i += arrowInterval) {
-        const cell = path[i];
-        const nextCell = path[i + 1];
+    // Place small arrows along the curve at regular intervals
+    const numArrows = Math.max(5, Math.floor(path.length / 2));
+    for (let i = 1; i < numArrows; i++) {
+        const t = i / numArrows; // Parameter along curve (0 to 1)
+        const point = curve.getPoint(t);
+        const tangent = curve.getTangent(t);
         
-        const x = cell.col * CELL_SIZE + CELL_SIZE / 2;
-        const z = cell.row * CELL_SIZE + CELL_SIZE / 2;
-        const nextX = nextCell.col * CELL_SIZE + CELL_SIZE / 2;
-        const nextZ = nextCell.row * CELL_SIZE + CELL_SIZE / 2;
-        
-        // Arrow cone pointing in direction of travel
-        const arrowGeo = new THREE.ConeGeometry(0.25, 0.6, 8);
+        // Small cone arrow that fits within the tube width
+        const arrowGeo = new THREE.ConeGeometry(0.08, 0.25, 6);
         const arrow = new THREE.Mesh(arrowGeo, arrowMaterial);
-        arrow.position.set(x, 0.5, z);
+        arrow.position.copy(point);
+        arrow.position.y += 0.15; // Slightly above the tube
         
-        // Rotate cone to lay flat and point toward next cell
-        // Cone points up (+Y) by default, rotate to point along travel direction
-        const angle = Math.atan2(nextX - x, nextZ - z);
+        // Orient arrow along the tangent direction
+        const angle = Math.atan2(tangent.x, tangent.z);
         arrow.rotation.order = 'YXZ';
         arrow.rotation.y = angle;
         arrow.rotation.x = Math.PI / 2;
@@ -915,9 +1187,7 @@ function createSolutionMeshes(path) {
         solutionMeshes.push(arrow);
     }
     
-    console.log('Added', Math.floor((path.length - 2) / arrowInterval), 'direction arrows');
-    
-    console.log('Solution path created:', path.length, 'cells');
+    console.log('Solution path created:', path.length, 'cells,', numArrows - 1, 'arrows');
 }
 
 // Toggle solution visibility
