@@ -121,10 +121,12 @@ const PLAYER_RADIUS = 0.3;
 let isDropping = true;
 let dropStartTime = 0;
 const DROP_DURATION = 2.0; // seconds
-const DROP_HEIGHT = 25;
+let dropHeight = 25; // Will be calculated based on maze size
 const PLAYER_HEIGHT = 1.6;
 let targetPosition = new THREE.Vector3(2, PLAYER_HEIGHT, 2);
+let dropStartPosition = new THREE.Vector3(2, 25, 2); // Starting position for drop-in
 let spawnYaw = 0; // Rotation to face open corridor
+let skipMenuAfterDrop = false; // Skip showing menu after regeneration
 
 // Pointer lock events
 controls.addEventListener('lock', () => {
@@ -338,9 +340,24 @@ function buildMaze() {
             addMarker(cellX, cellZ, 0x61D095);
             // Set target position for drop-in animation
             targetPosition.set(cellX, PLAYER_HEIGHT, cellZ);
-            // Position camera high above for drop-in
-            camera.position.set(cellX, DROP_HEIGHT, cellZ);
-            camera.lookAt(cellX, 0, cellZ);
+            
+            // Calculate drop height to see entire maze
+            // Use FOV and maze dimensions to determine required height
+            const mazeWidth = cols * CELL_SIZE;
+            const mazeDepth = rows * CELL_SIZE;
+            const maxDimension = Math.max(mazeWidth, mazeDepth);
+            // With 75 degree FOV, we need height = dimension / (2 * tan(FOV/2))
+            // Add some padding (1.2x) to ensure full visibility
+            const fovRad = (75 / 2) * (Math.PI / 180);
+            dropHeight = Math.max(25, (maxDimension / 2) / Math.tan(fovRad) * 1.2);
+            
+            // Center camera over maze center for drop-in view
+            const mazeCenterX = mazeWidth / 2;
+            const mazeCenterZ = mazeDepth / 2;
+            dropStartPosition.set(mazeCenterX, dropHeight, mazeCenterZ);
+            
+            camera.position.copy(dropStartPosition);
+            camera.lookAt(mazeCenterX, 0, mazeCenterZ);
             
             // Determine which direction has an open corridor
             // Check links to find an open passage
@@ -488,9 +505,11 @@ function animate() {
         // Easing function (ease out cubic)
         const eased = 1 - Math.pow(1 - progress, 3);
         
-        // Interpolate camera position
-        const currentY = DROP_HEIGHT - (DROP_HEIGHT - PLAYER_HEIGHT) * eased;
-        camera.position.y = currentY;
+        // Interpolate camera position from center (dropStartPosition) to target (start cell)
+        const currentX = dropStartPosition.x + (targetPosition.x - dropStartPosition.x) * eased;
+        const currentY = dropHeight - (dropHeight - PLAYER_HEIGHT) * eased;
+        const currentZ = dropStartPosition.z + (targetPosition.z - dropStartPosition.z) * eased;
+        camera.position.set(currentX, currentY, currentZ);
         
         // Gradually rotate camera from looking down to looking forward
         // Also smoothly rotate yaw towards the spawn direction
@@ -504,12 +523,19 @@ function animate() {
         
         if (progress >= 1) {
             isDropping = false;
-            camera.position.y = PLAYER_HEIGHT;
+            camera.position.set(targetPosition.x, PLAYER_HEIGHT, targetPosition.z);
             camera.rotation.set(0, spawnYaw, 0);
-            // Show instructions to click for pointer lock
-            instructions.querySelector('h2').textContent = 'Ready!';
-            instructions.querySelector('.click-prompt').textContent = 'Click to explore';
-            instructions.classList.remove('hidden');
+            
+            if (skipMenuAfterDrop) {
+                // After regeneration, auto-lock controls without showing menu
+                skipMenuAfterDrop = false;
+                controls.lock();
+            } else {
+                // Show instructions to click for pointer lock
+                instructions.querySelector('h2').textContent = 'Ready!';
+                instructions.querySelector('.click-prompt').textContent = 'Click to explore';
+                instructions.classList.remove('hidden');
+            }
         }
     }
 
@@ -577,11 +603,36 @@ function animate() {
 
 animate();
 
-// Minimap drawing
+// Minimap drawing with zoom for large mazes
+const MINIMAP_VISIBLE_CELLS = 12; // Number of cells to show when zoomed
+
 function drawMinimap() {
     const { rows, cols, cells, entrances } = mazeData;
     const mapSize = minimapCanvas.width;
-    const cellSize = mapSize / Math.max(rows, cols);
+    const maxDimension = Math.max(rows, cols);
+    
+    // Determine if we need to zoom (large maze)
+    const needsZoom = maxDimension > MINIMAP_VISIBLE_CELLS;
+    
+    // Calculate cell size based on zoom level
+    const cellSize = needsZoom 
+        ? mapSize / MINIMAP_VISIBLE_CELLS 
+        : mapSize / maxDimension;
+    
+    // Get player position in cell coordinates
+    const playerCellX = camera.position.x / CELL_SIZE;
+    const playerCellZ = camera.position.z / CELL_SIZE;
+    
+    // Calculate view offset for zoomed minimap (center on player)
+    let offsetX = 0;
+    let offsetZ = 0;
+    if (needsZoom) {
+        offsetX = playerCellX - MINIMAP_VISIBLE_CELLS / 2;
+        offsetZ = playerCellZ - MINIMAP_VISIBLE_CELLS / 2;
+        // Clamp to maze bounds
+        offsetX = Math.max(0, Math.min(offsetX, cols - MINIMAP_VISIBLE_CELLS));
+        offsetZ = Math.max(0, Math.min(offsetZ, rows - MINIMAP_VISIBLE_CELLS));
+    }
     
     // Clear
     minimapCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
@@ -598,9 +649,16 @@ function drawMinimap() {
 
     cells.forEach(cell => {
         const { row, col, links, isStart, isEnd } = cell;
+        
+        // Skip cells outside visible area when zoomed
+        if (needsZoom) {
+            if (col < offsetX - 1 || col > offsetX + MINIMAP_VISIBLE_CELLS + 1) return;
+            if (row < offsetZ - 1 || row > offsetZ + MINIMAP_VISIBLE_CELLS + 1) return;
+        }
+        
         const entranceDir = entranceMap.get(cell.id);
-        const x = col * cellSize;
-        const y = row * cellSize;
+        const x = (col - offsetX) * cellSize;
+        const y = (row - offsetZ) * cellSize;
 
         // North wall
         const northId = row > 0 ? (row - 1) * cols + col : null;
@@ -643,9 +701,9 @@ function drawMinimap() {
 
     minimapCtx.stroke();
 
-    // Draw player position
-    const playerMapX = (camera.position.x / CELL_SIZE) * cellSize;
-    const playerMapZ = (camera.position.z / CELL_SIZE) * cellSize;
+    // Draw player position (adjusted for offset)
+    const playerMapX = (playerCellX - offsetX) * cellSize;
+    const playerMapZ = (playerCellZ - offsetZ) * cellSize;
 
     // Player direction indicator
     const dir = new THREE.Vector3(0, 0, -1);
@@ -679,6 +737,10 @@ document.addEventListener('keydown', (event) => {
     // Toggle solution path with P key
     if (event.code === 'KeyP') {
         toggleSolutionPath();
+    }
+    // Regenerate maze with R key
+    if (event.code === 'KeyR') {
+        regenerateMaze();
     }
 });
 
@@ -831,4 +893,157 @@ function toggleSolutionPath() {
     console.log('Solution path:', solutionVisible ? 'visible' : 'hidden');
 }
 
-console.log('3D Maze initialized. Click to start exploring! Press M for minimap, P for solution path.');
+// Regenerate maze in 3D view
+function regenerateMaze() {
+    if (!mazeData) return;
+    
+    const { rows, cols } = mazeData;
+    
+    // Generate new maze using Wilson's algorithm (simplified version)
+    // Build fresh cell data
+    const newCells = [];
+    const totalCells = rows * cols;
+    
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            const id = row * cols + col;
+            newCells.push({
+                id,
+                row,
+                col,
+                isStart: false,
+                isEnd: false,
+                links: []
+            });
+        }
+    }
+    
+    // Create cell lookup
+    const cellMap = new Map();
+    newCells.forEach(c => cellMap.set(c.id, c));
+    
+    // Helper to get neighbor id
+    const getNeighborId = (row, col) => {
+        if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
+        return row * cols + col;
+    };
+    
+    // Wilson's algorithm
+    const inMaze = new Set();
+    // Start with random cell in maze
+    const firstId = Math.floor(Math.random() * totalCells);
+    inMaze.add(firstId);
+    
+    while (inMaze.size < totalCells) {
+        // Pick random cell not in maze
+        let startId;
+        do {
+            startId = Math.floor(Math.random() * totalCells);
+        } while (inMaze.has(startId));
+        
+        // Random walk until we hit the maze
+        const walk = [startId];
+        let currentId = startId;
+        
+        while (!inMaze.has(currentId)) {
+            const current = cellMap.get(currentId);
+            const neighbors = [];
+            
+            const northId = getNeighborId(current.row - 1, current.col);
+            const southId = getNeighborId(current.row + 1, current.col);
+            const eastId = getNeighborId(current.row, current.col + 1);
+            const westId = getNeighborId(current.row, current.col - 1);
+            
+            if (northId !== null) neighbors.push(northId);
+            if (southId !== null) neighbors.push(southId);
+            if (eastId !== null) neighbors.push(eastId);
+            if (westId !== null) neighbors.push(westId);
+            
+            const nextId = neighbors[Math.floor(Math.random() * neighbors.length)];
+            
+            // Check for loop
+            const loopIdx = walk.indexOf(nextId);
+            if (loopIdx !== -1) {
+                // Erase loop
+                walk.length = loopIdx + 1;
+            } else {
+                walk.push(nextId);
+            }
+            currentId = nextId;
+        }
+        
+        // Add walk to maze with links
+        for (let i = 0; i < walk.length - 1; i++) {
+            const cellA = cellMap.get(walk[i]);
+            const cellB = cellMap.get(walk[i + 1]);
+            if (!cellA.links.includes(cellB.id)) cellA.links.push(cellB.id);
+            if (!cellB.links.includes(cellA.id)) cellB.links.push(cellA.id);
+            inMaze.add(walk[i]);
+        }
+    }
+    
+    // Choose entrances (north/south or east/west)
+    const entrances = [];
+    if (Math.random() < 0.5) {
+        // North/South
+        const northCol = Math.floor(Math.random() * cols);
+        const southCol = Math.floor(Math.random() * cols);
+        const northCell = cellMap.get(northCol);
+        const southCell = cellMap.get((rows - 1) * cols + southCol);
+        northCell.isStart = true;
+        southCell.isEnd = true;
+        entrances.push({ cellId: northCell.id, direction: 'north' });
+        entrances.push({ cellId: southCell.id, direction: 'south' });
+    } else {
+        // East/West
+        const westRow = Math.floor(Math.random() * rows);
+        const eastRow = Math.floor(Math.random() * rows);
+        const westCell = cellMap.get(westRow * cols);
+        const eastCell = cellMap.get(eastRow * cols + (cols - 1));
+        westCell.isStart = true;
+        eastCell.isEnd = true;
+        entrances.push({ cellId: westCell.id, direction: 'west' });
+        entrances.push({ cellId: eastCell.id, direction: 'east' });
+    }
+    
+    // Update mazeData
+    mazeData = {
+        rows,
+        cols,
+        cells: newCells,
+        entrances
+    };
+    
+    // Save to localStorage
+    localStorage.setItem('mazeData', JSON.stringify(mazeData));
+    
+    // Clear existing 3D objects (except skybox and lights)
+    const objectsToRemove = [];
+    scene.traverse((obj) => {
+        if (obj.isMesh && obj !== skybox) {
+            objectsToRemove.push(obj);
+        }
+    });
+    objectsToRemove.forEach(obj => scene.remove(obj));
+    
+    // Clear collision boxes
+    wallBoundingBoxes.length = 0;
+    
+    // Clear solution path
+    solutionPath = [];
+    solutionMeshes = [];
+    solutionVisible = false;
+    
+    // Rebuild maze
+    buildMaze();
+    
+    // Reset drop-in animation (skip menu since user is already playing)
+    isDropping = true;
+    dropStartTime = performance.now();
+    skipMenuAfterDrop = true;
+    instructions.classList.add('hidden');
+    
+    console.log('Maze regenerated!');
+}
+
+console.log('3D Maze initialized. Press M for minimap, P for solution path, R to regenerate.');
