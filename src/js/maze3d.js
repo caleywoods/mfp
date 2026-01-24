@@ -2125,10 +2125,10 @@ function regenerateMaze() {
     // Save to localStorage
     localStorage.setItem('mazeData', JSON.stringify(mazeData));
     
-    // Clear existing 3D objects (except skybox and lights)
+    // Clear existing 3D objects (except skybox, lights, and snow)
     const objectsToRemove = [];
     scene.traverse((obj) => {
-        if (obj.isMesh && obj !== skybox) {
+        if ((obj.isMesh || obj.isGroup) && obj !== skybox && obj !== snowParticles && obj.parent === scene) {
             objectsToRemove.push(obj);
         }
     });
