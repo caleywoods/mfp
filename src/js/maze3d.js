@@ -2175,11 +2175,23 @@ function regenerateMaze() {
     // Rebuild maze
     buildMaze();
     
-    // Reset drop-in animation (skip menu since user is already playing)
+    // Check if we were already in top-down view (not yet dropped in)
+    const wasInTopDownView = isDropping && dropStartTime === 0;
+    
+    // Reset drop-in animation
     isDropping = true;
-    dropStartTime = performance.now();
-    skipMenuAfterDrop = true;
-    instructions.classList.add('hidden');
+    
+    if (wasInTopDownView) {
+        // Stay in top-down view, don't auto-drop
+        dropStartTime = 0;
+        instructions.classList.remove('hidden');
+        skipMenuAfterDrop = false;
+    } else {
+        // Was playing, auto-drop into new maze
+        dropStartTime = performance.now();
+        skipMenuAfterDrop = true;
+        instructions.classList.add('hidden');
+    }
     
     console.log('Maze regenerated!');
 }
