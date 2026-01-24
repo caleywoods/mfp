@@ -88,6 +88,14 @@
             .hidden {
                 display: none !important;
             }
+            #minimap {
+                position: absolute;
+                bottom: 1rem;
+                right: 1rem;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+                border-radius: 0.5rem;
+                z-index: 100;
+            }
         </style>
     </head>
     <body class="bg-slate-900">
@@ -105,10 +113,13 @@
             <p><strong>WASD</strong> - Move</p>
             <p><strong>Mouse</strong> - Look around</p>
             <p><strong>ESC</strong> - Release mouse</p>
-            <p class="click-prompt">Click anywhere to start</p>
+            <p><strong>M</strong> - Toggle minimap</p>
+            <p class="click-prompt">Click to drop in!</p>
         </div>
 
         <div id="crosshair" class="hidden"></div>
+
+        <canvas id="minimap" width="200" height="200"></canvas>
 
         <canvas id="maze-container"></canvas>
 

@@ -237,4 +237,39 @@ export default class Grid {
             this.entrances.set(eastCell.id, {direction: 'east', cell: eastCell});
         }
     }
+
+    toJSON() {
+        const cells = [];
+        
+        for (let row = 0; row < this.rows; row++) {
+            for (let col = 0; col < this.cols; col++) {
+                const cell = this.cells[row][col];
+                const linkedIds = Array.from(cell.links.keys()).map(c => c.id);
+                
+                cells.push({
+                    id: cell.id,
+                    row: cell.row,
+                    col: cell.col,
+                    isStart: cell.isStart,
+                    isEnd: cell.isEnd,
+                    links: linkedIds
+                });
+            }
+        }
+
+        const entrances = [];
+        this.entrances.forEach((value, key) => {
+            entrances.push({
+                cellId: key,
+                direction: value.direction
+            });
+        });
+
+        return {
+            rows: this.rows,
+            cols: this.cols,
+            cells: cells,
+            entrances: entrances
+        };
+    }
 }

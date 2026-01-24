@@ -292,7 +292,10 @@ document.querySelector('#enter-maze-btn').addEventListener('click', () => {
         return;
     }
     
+    // Serialize maze data to localStorage
+    const mazeData = maze.toJSON();
+    localStorage.setItem('mazeData', JSON.stringify(mazeData));
+    
     // Navigate to 3D maze page
-    // In Phase 2, we'll serialize maze data to localStorage before navigating
     window.location.href = '/maze3d.html';
 });
